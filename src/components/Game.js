@@ -1,40 +1,43 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import Board from "./Board";
+import BoardSizeSelector from "./BoardSizeSelector";
 import LearnModal from "./LearnModal";
 import MoveHistory from "./MoveHistory";
 import StatusPanel from "./StatusPanel";
 import {
   calculateWinner,
+  createBoardRules,
   createEmptyBoard,
   DEFAULT_BOARD_RULES,
   getMoveLocation,
   isBoardFull,
 } from "../utils/gameLogic";
 
-const CURRENT_BOARD_RULES = DEFAULT_BOARD_RULES;
-
-function createInitialEntry() {
+function createInitialEntry(boardSize) {
   return {
-    squares: createEmptyBoard(CURRENT_BOARD_RULES.boardSize),
+    squares: createEmptyBoard(boardSize),
     moveLocation: null,
     player: null,
   };
 }
 
 export default function Game() {
-  const [history, setHistory] = useState(() => [createInitialEntry()]);
+  const [boardRules, setBoardRules] = useState(DEFAULT_BOARD_RULES);
+  const [history, setHistory] = useState(() => [
+    createInitialEntry(DEFAULT_BOARD_RULES.boardSize),
+  ]);
   const [currentMove, setCurrentMove] = useState(0);
   const [isAscending, setIsAscending] = useState(true);
   const [isLearnModalOpen, setIsLearnModalOpen] = useState(false);
   const learnButtonRef = useRef(null);
 
   const currentEntry = history[currentMove];
-  const { boardSize } = CURRENT_BOARD_RULES;
+  const { boardSize, winLength } = boardRules;
   const xIsNext = currentMove % 2 === 0;
 
   const winnerInfo = useMemo(
-    () => calculateWinner(currentEntry.squares, CURRENT_BOARD_RULES),
-    [currentEntry.squares]
+    () => calculateWinner(currentEntry.squares, boardRules),
+    [boardRules, currentEntry.squares]
   );
   const isDraw = !winnerInfo && isBoardFull(currentEntry.squares);
 
@@ -79,7 +82,16 @@ export default function Game() {
   }, []);
 
   const handleReset = useCallback(() => {
-    setHistory([createInitialEntry()]);
+    setHistory([createInitialEntry(boardSize)]);
+    setCurrentMove(0);
+    setIsAscending(true);
+  }, [boardSize]);
+
+  const handleBoardSizeChange = useCallback((nextBoardSize) => {
+    const nextBoardRules = createBoardRules(nextBoardSize);
+
+    setBoardRules(nextBoardRules);
+    setHistory([createInitialEntry(nextBoardRules.boardSize)]);
     setCurrentMove(0);
     setIsAscending(true);
   }, []);
@@ -107,7 +119,13 @@ export default function Game() {
           isDraw={isDraw}
           winner={winnerInfo?.winner ?? null}
           boardSize={boardSize}
+          winLength={winLength}
           xIsNext={xIsNext}
+        />
+
+        <BoardSizeSelector
+          boardRules={boardRules}
+          onBoardSizeChange={handleBoardSizeChange}
         />
 
         <div className="learn-callout">
@@ -143,6 +161,22 @@ export default function Game() {
           </div>
 
           <aside className="sidebar">
+            <div className="sidebar-card sidebar-actions">
+              <div>
+                <p className="eyebrow">Controls</p>
+                <h2>Start again</h2>
+              </div>
+
+              <button
+                type="button"
+                className="reset-button"
+                onClick={handleReset}
+                disabled={history.length === 1}
+              >
+                Reset Game
+              </button>
+            </div>
+
             <div className="sidebar-card">
               <div className="sidebar-header">
                 <div>
@@ -171,26 +205,11 @@ export default function Game() {
               />
             </div>
 
-            <div className="sidebar-card sidebar-actions">
-              <div>
-                <p className="eyebrow">Controls</p>
-                <h2>Start again</h2>
-              </div>
-
-              <button
-                type="button"
-                className="reset-button"
-                onClick={handleReset}
-                disabled={history.length === 1}
-              >
-                Reset Game
-              </button>
-            </div>
           </aside>
         </div>
 
         {isLearnModalOpen ? (
-          <LearnModal onClose={handleCloseLearnModal} />
+          <LearnModal boardRules={boardRules} onClose={handleCloseLearnModal} />
         ) : null}
       </section>
     </main>
