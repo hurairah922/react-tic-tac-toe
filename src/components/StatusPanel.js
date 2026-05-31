@@ -15,7 +15,7 @@ function StatusPanel({ currentMove, isDraw, winner, xIsNext }) {
   return (
     <header className="status-panel">
       <div>
-        <p className="eyebrow">React tutorial challenge</p>
+        <p className="eyebrow">A Modern</p>
         <h1>Tic-Tac-Toe</h1>
       </div>
 

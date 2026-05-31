@@ -1,5 +1,6 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import Board from "./Board";
+import LearnModal from "./LearnModal";
 import MoveHistory from "./MoveHistory";
 import StatusPanel from "./StatusPanel";
 import {
@@ -19,6 +20,8 @@ export default function Game() {
   const [history, setHistory] = useState([INITIAL_ENTRY]);
   const [currentMove, setCurrentMove] = useState(0);
   const [isAscending, setIsAscending] = useState(true);
+  const [isLearnModalOpen, setIsLearnModalOpen] = useState(false);
+  const learnButtonRef = useRef(null);
 
   const currentEntry = history[currentMove];
   const xIsNext = currentMove % 2 === 0;
@@ -71,6 +74,17 @@ export default function Game() {
     setIsAscending((previousValue) => !previousValue);
   }, []);
 
+  const handleOpenLearnModal = useCallback(() => {
+    setIsLearnModalOpen(true);
+  }, []);
+
+  const handleCloseLearnModal = useCallback(() => {
+    setIsLearnModalOpen(false);
+    window.requestAnimationFrame(() => {
+      learnButtonRef.current?.focus();
+    });
+  }, []);
+
   return (
     <main className="app-shell">
       <section className="game-card" aria-label="Tic-tac-toe game">
@@ -80,6 +94,27 @@ export default function Game() {
           winner={winnerInfo?.winner ?? null}
           xIsNext={xIsNext}
         />
+
+        <div className="learn-callout">
+          <div>
+            <p className="eyebrow">New here?</p>
+            <p className="learn-callout-copy">
+              Review the rules, winning lines, draws, move history, and reset.
+            </p>
+          </div>
+
+          <button
+            ref={learnButtonRef}
+            type="button"
+            className="learn-button"
+            onClick={handleOpenLearnModal}
+            aria-haspopup="dialog"
+            aria-expanded={isLearnModalOpen}
+            aria-controls="learn-modal"
+          >
+            Learn how to play
+          </button>
+        </div>
 
         <div className="game-layout">
           <div className="board-panel">
@@ -137,6 +172,10 @@ export default function Game() {
             </div>
           </aside>
         </div>
+
+        {isLearnModalOpen ? (
+          <LearnModal onClose={handleCloseLearnModal} />
+        ) : null}
       </section>
     </main>
   );
