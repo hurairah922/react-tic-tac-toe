@@ -1,4 +1,5 @@
 import { memo, useEffect, useRef } from "react";
+import { DEFAULT_BOARD_RULES } from "../utils/gameLogic";
 
 const FOCUSABLE_SELECTOR = [
   "a[href]",
@@ -30,9 +31,10 @@ const WINNING_PATTERNS = [
   },
 ];
 
-function LearnModal({ onClose }) {
+function LearnModal({ boardRules = DEFAULT_BOARD_RULES, onClose }) {
   const dialogRef = useRef(null);
   const closeButtonRef = useRef(null);
+  const totalSquares = boardRules.boardSize * boardRules.boardSize;
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
@@ -116,8 +118,9 @@ function LearnModal({ onClose }) {
         </div>
 
         <p id="learn-modal-description" className="learn-modal-intro">
-          Tic-tac-toe is a two-player game where X and O race to claim three
-          squares in a straight line.
+          Tic-tac-toe is a two-player game where X and O race to claim{" "}
+          {boardRules.winLength} squares in a straight line on the current{" "}
+          {boardRules.boardSize} x {boardRules.boardSize} board.
         </p>
 
         <div className="learn-sections">
@@ -132,16 +135,18 @@ function LearnModal({ onClose }) {
           <section>
             <h3>Winning lines</h3>
             <p>
-              Win by placing three of your marks in one row, one column, or one
-              diagonal. The winning squares are highlighted when the round ends.
+              Win by placing {boardRules.winLength} of your marks in one row,
+              one column, or one diagonal. The winning squares are highlighted
+              when the round ends.
             </p>
           </section>
 
           <section>
             <h3>Draws and reset</h3>
             <p>
-              If all nine squares are filled and nobody has a winning line, the
-              game is a draw. Use Reset Game to clear the board and start over.
+              If all {totalSquares} squares are filled and nobody has a winning
+              line, the game is a draw. Use Reset Game to clear the board and
+              start over with the selected board size.
             </p>
           </section>
 
@@ -161,9 +166,10 @@ function LearnModal({ onClose }) {
         >
           <div className="winning-patterns-copy">
             <p className="eyebrow">Winning patterns</p>
-            <h3 id="winning-patterns-title">Three ways to win</h3>
+            <h3 id="winning-patterns-title">Example winning patterns</h3>
             <p>
-              A highlighted cell also says WIN, so the example is clear even
+              These classic 3 x 3 examples show rows, columns, and diagonals. A
+              highlighted cell also says WIN, so the example is clear even
               without relying on color.
             </p>
           </div>

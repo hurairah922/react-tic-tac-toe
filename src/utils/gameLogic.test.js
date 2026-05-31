@@ -1,5 +1,6 @@
 import {
   calculateWinner,
+  createBoardRules,
   createEmptyBoard,
   getDefaultWinLength,
   getMoveLocation,
@@ -17,6 +18,13 @@ describe("gameLogic", () => {
     expect(getDefaultWinLength(3)).toBe(3);
     expect(getDefaultWinLength(4)).toBe(4);
     expect(getDefaultWinLength(5)).toBe(4);
+  });
+
+  test("creates supported board presets for setup UI", () => {
+    expect(createBoardRules(3)).toEqual({ boardSize: 3, winLength: 3 });
+    expect(createBoardRules(4)).toEqual({ boardSize: 4, winLength: 4 });
+    expect(createBoardRules(5)).toEqual({ boardSize: 5, winLength: 4 });
+    expect(createBoardRules(6)).toEqual({ boardSize: 3, winLength: 3 });
   });
 
   test("detects a 3x3 row winner and winning indexes", () => {

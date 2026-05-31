@@ -1,6 +1,13 @@
 import { memo } from "react";
 
-function StatusPanel({ currentMove, isDraw, winner, boardSize, xIsNext }) {
+function StatusPanel({
+  currentMove,
+  isDraw,
+  winner,
+  boardSize,
+  winLength,
+  xIsNext,
+}) {
   let status = `Next player: ${xIsNext ? "X" : "O"}`;
   let detail = "Choose an empty square to continue.";
 
@@ -34,6 +41,10 @@ function StatusPanel({ currentMove, isDraw, winner, boardSize, xIsNext }) {
           <dd>
             {boardSize} x {boardSize}
           </dd>
+        </div>
+        <div>
+          <dt>Win condition</dt>
+          <dd>{winLength} in a row</dd>
         </div>
       </dl>
     </header>

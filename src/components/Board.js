@@ -9,6 +9,10 @@ function Board({
   winningLine,
   isGameOver,
 }) {
+  const boardStyle = {
+    gridTemplateRows: `repeat(${boardSize}, minmax(0, 1fr))`,
+  };
+
   const rowStyle = {
     gridTemplateColumns: `repeat(${boardSize}, minmax(0, 1fr))`,
   };
@@ -42,11 +46,12 @@ function Board({
     <section className="board-card" aria-labelledby="board-heading">
       <div className="board-copy">
         <p className="eyebrow">Board</p>
-        <h2 id="board-heading">Make your move</h2>
+        {isGameOver ? <h2 id="board-heading">Game Over</h2> : <h2 id="board-heading">Make your move</h2>}
       </div>
 
       <div
         className="board-grid"
+        style={boardStyle}
         role="grid"
         aria-label="Tic-tac-toe board"
       >

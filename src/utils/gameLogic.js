@@ -5,9 +5,20 @@ export function getDefaultWinLength(boardSize = DEFAULT_BOARD_SIZE) {
   return boardSize === 5 ? 4 : boardSize;
 }
 
+export function createBoardRules(boardSize = DEFAULT_BOARD_SIZE) {
+  const numericBoardSize = Number(boardSize);
+  const safeBoardSize = SUPPORTED_BOARD_SIZES.includes(numericBoardSize)
+    ? numericBoardSize
+    : DEFAULT_BOARD_SIZE;
+
+  return {
+    boardSize: safeBoardSize,
+    winLength: getDefaultWinLength(safeBoardSize),
+  };
+}
+
 export const DEFAULT_BOARD_RULES = Object.freeze({
-  boardSize: DEFAULT_BOARD_SIZE,
-  winLength: getDefaultWinLength(DEFAULT_BOARD_SIZE),
+  ...createBoardRules(DEFAULT_BOARD_SIZE),
 });
 
 function normalizeBoardRules(boardRules = DEFAULT_BOARD_RULES) {
