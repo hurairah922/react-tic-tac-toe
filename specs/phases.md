@@ -88,7 +88,7 @@ Testing notes:
 
 ## Phase 2: Dynamic Board Rules Foundation
 
-Status: `Active`
+Status: `Done`
 
 Goal:
 

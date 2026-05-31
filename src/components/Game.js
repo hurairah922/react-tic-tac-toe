@@ -6,28 +6,34 @@ import StatusPanel from "./StatusPanel";
 import {
   calculateWinner,
   createEmptyBoard,
+  DEFAULT_BOARD_RULES,
   getMoveLocation,
   isBoardFull,
 } from "../utils/gameLogic";
 
-const INITIAL_ENTRY = {
-  squares: createEmptyBoard(),
-  moveLocation: null,
-  player: null,
-};
+const CURRENT_BOARD_RULES = DEFAULT_BOARD_RULES;
+
+function createInitialEntry() {
+  return {
+    squares: createEmptyBoard(CURRENT_BOARD_RULES.boardSize),
+    moveLocation: null,
+    player: null,
+  };
+}
 
 export default function Game() {
-  const [history, setHistory] = useState([INITIAL_ENTRY]);
+  const [history, setHistory] = useState(() => [createInitialEntry()]);
   const [currentMove, setCurrentMove] = useState(0);
   const [isAscending, setIsAscending] = useState(true);
   const [isLearnModalOpen, setIsLearnModalOpen] = useState(false);
   const learnButtonRef = useRef(null);
 
   const currentEntry = history[currentMove];
+  const { boardSize } = CURRENT_BOARD_RULES;
   const xIsNext = currentMove % 2 === 0;
 
   const winnerInfo = useMemo(
-    () => calculateWinner(currentEntry.squares),
+    () => calculateWinner(currentEntry.squares, CURRENT_BOARD_RULES),
     [currentEntry.squares]
   );
   const isDraw = !winnerInfo && isBoardFull(currentEntry.squares);
@@ -49,7 +55,7 @@ export default function Game() {
         ...history.slice(0, currentMove + 1),
         {
           squares: nextSquares,
-          moveLocation: getMoveLocation(squareIndex),
+          moveLocation: getMoveLocation(squareIndex, boardSize),
           player,
         },
       ];
@@ -57,7 +63,15 @@ export default function Game() {
       setHistory(nextHistory);
       setCurrentMove(nextHistory.length - 1);
     },
-    [currentEntry.squares, currentMove, history, isDraw, winnerInfo, xIsNext]
+    [
+      boardSize,
+      currentEntry.squares,
+      currentMove,
+      history,
+      isDraw,
+      winnerInfo,
+      xIsNext,
+    ]
   );
 
   const handleJumpTo = useCallback((nextMove) => {
@@ -65,7 +79,7 @@ export default function Game() {
   }, []);
 
   const handleReset = useCallback(() => {
-    setHistory([INITIAL_ENTRY]);
+    setHistory([createInitialEntry()]);
     setCurrentMove(0);
     setIsAscending(true);
   }, []);
@@ -92,6 +106,7 @@ export default function Game() {
           currentMove={currentMove}
           isDraw={isDraw}
           winner={winnerInfo?.winner ?? null}
+          boardSize={boardSize}
           xIsNext={xIsNext}
         />
 
@@ -120,6 +135,7 @@ export default function Game() {
           <div className="board-panel">
             <Board
               squares={currentEntry.squares}
+              boardSize={boardSize}
               onPlay={handlePlay}
               winningLine={winnerInfo?.line ?? []}
               isGameOver={Boolean(winnerInfo) || isDraw}

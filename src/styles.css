@@ -208,7 +208,8 @@ button:disabled {
 .board-grid {
   display: grid;
   gap: 10px;
-  width: fit-content;
+  width: var(--board-size);
+  max-width: 100%;
   margin: 0 auto;
 }
 
@@ -220,7 +221,8 @@ button:disabled {
 
 .square {
   position: relative;
-  width: calc((var(--board-size) - 20px) / 3);
+  width: 100%;
+  min-width: 0;
   aspect-ratio: 1;
   padding: 0;
   border: 1px solid rgba(86, 62, 46, 0.2);

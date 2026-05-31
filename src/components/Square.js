@@ -1,8 +1,8 @@
 import { memo } from "react";
 
-function Square({ index, value, isWinning, isDisabled, onClick }) {
-  const row = Math.floor(index / 3) + 1;
-  const column = (index % 3) + 1;
+function Square({ index, boardSize, value, isWinning, isDisabled, onClick }) {
+  const row = Math.floor(index / boardSize) + 1;
+  const column = (index % boardSize) + 1;
   const squareState = value ? `occupied by ${value}` : "empty";
 
   return (
