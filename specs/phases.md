@@ -105,7 +105,7 @@ Acceptance criteria:
 
 ## Phase 3: Board Setup UI
 
-Status: `Not Started`
+Status: `Active`
 
 Goal:
 
