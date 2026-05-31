@@ -1,32 +1,80 @@
-export const BOARD_SIZE = 3;
+export const SUPPORTED_BOARD_SIZES = [3, 4, 5];
+export const DEFAULT_BOARD_SIZE = 3;
 
-const WINNING_LINES = [
-  [0, 1, 2],
-  [3, 4, 5],
-  [6, 7, 8],
-  [0, 3, 6],
-  [1, 4, 7],
-  [2, 5, 8],
-  [0, 4, 8],
-  [2, 4, 6],
-];
-
-export function createEmptyBoard() {
-  return Array(BOARD_SIZE * BOARD_SIZE).fill(null);
+export function getDefaultWinLength(boardSize = DEFAULT_BOARD_SIZE) {
+  return boardSize === 5 ? 4 : boardSize;
 }
 
-export function calculateWinner(squares) {
-  // Return both the winner and the exact line so the UI can highlight it.
-  for (const [first, second, third] of WINNING_LINES) {
-    if (
-      squares[first] &&
-      squares[first] === squares[second] &&
-      squares[first] === squares[third]
-    ) {
-      return {
-        winner: squares[first],
-        line: [first, second, third],
-      };
+export const DEFAULT_BOARD_RULES = Object.freeze({
+  boardSize: DEFAULT_BOARD_SIZE,
+  winLength: getDefaultWinLength(DEFAULT_BOARD_SIZE),
+});
+
+function normalizeBoardRules(boardRules = DEFAULT_BOARD_RULES) {
+  const boardSize = boardRules.boardSize ?? DEFAULT_BOARD_RULES.boardSize;
+  const winLength = boardRules.winLength ?? getDefaultWinLength(boardSize);
+
+  return { boardSize, winLength };
+}
+
+function isWithinBoard(row, column, boardSize) {
+  return row >= 0 && row < boardSize && column >= 0 && column < boardSize;
+}
+
+function getSquareIndex(row, column, boardSize) {
+  return row * boardSize + column;
+}
+
+export function createEmptyBoard(boardSize = DEFAULT_BOARD_RULES.boardSize) {
+  return Array(boardSize * boardSize).fill(null);
+}
+
+export function calculateWinner(squares, boardRules = DEFAULT_BOARD_RULES) {
+  const { boardSize, winLength } = normalizeBoardRules(boardRules);
+  const directions = [
+    [0, 1],
+    [1, 0],
+    [1, 1],
+    [1, -1],
+  ];
+
+  for (let row = 0; row < boardSize; row += 1) {
+    for (let column = 0; column < boardSize; column += 1) {
+      const squareIndex = getSquareIndex(row, column, boardSize);
+      const player = squares[squareIndex];
+
+      if (!player) {
+        continue;
+      }
+
+      for (const [rowStep, columnStep] of directions) {
+        const lastRow = row + rowStep * (winLength - 1);
+        const lastColumn = column + columnStep * (winLength - 1);
+
+        if (!isWithinBoard(lastRow, lastColumn, boardSize)) {
+          continue;
+        }
+
+        const line = [];
+        let hasWinningLine = true;
+
+        for (let offset = 0; offset < winLength; offset += 1) {
+          const nextRow = row + rowStep * offset;
+          const nextColumn = column + columnStep * offset;
+          const nextIndex = getSquareIndex(nextRow, nextColumn, boardSize);
+
+          if (squares[nextIndex] !== player) {
+            hasWinningLine = false;
+            break;
+          }
+
+          line.push(nextIndex);
+        }
+
+        if (hasWinningLine) {
+          return { winner: player, line };
+        }
+      }
     }
   }
 
@@ -37,11 +85,12 @@ export function isBoardFull(squares) {
   return squares.every(Boolean);
 }
 
-export function getMoveLocation(squareIndex) {
-  // Convert the internal 0-based square index into the tutorial's 1-based
-  // row and column display format for move history.
+export function getMoveLocation(
+  squareIndex,
+  boardSize = DEFAULT_BOARD_RULES.boardSize
+) {
   return {
-    row: Math.floor(squareIndex / BOARD_SIZE) + 1,
-    col: (squareIndex % BOARD_SIZE) + 1,
+    row: Math.floor(squareIndex / boardSize) + 1,
+    col: (squareIndex % boardSize) + 1,
   };
 }

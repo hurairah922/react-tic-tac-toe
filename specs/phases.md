@@ -45,7 +45,7 @@ Acceptance criteria:
 
 ## Phase 1: Learn How to Play Modal
 
-Status: `Active`
+Status: `Done`
 
 Goal:
 
@@ -88,7 +88,7 @@ Testing notes:
 
 ## Phase 2: Dynamic Board Rules Foundation
 
-Status: `Not Started`
+Status: `Done`
 
 Goal:
 
