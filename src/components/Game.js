@@ -128,27 +128,6 @@ export default function Game() {
           onBoardSizeChange={handleBoardSizeChange}
         />
 
-        <div className="learn-callout">
-          <div>
-            <p className="eyebrow">New here?</p>
-            <p className="learn-callout-copy">
-              Review the rules, winning lines, draws, move history, and reset.
-            </p>
-          </div>
-
-          <button
-            ref={learnButtonRef}
-            type="button"
-            className="learn-button"
-            onClick={handleOpenLearnModal}
-            aria-haspopup="dialog"
-            aria-expanded={isLearnModalOpen}
-            aria-controls="learn-modal"
-          >
-            Learn how to play
-          </button>
-        </div>
-
         <div className="game-layout">
           <div className="board-panel">
             <Board
@@ -206,6 +185,28 @@ export default function Game() {
             </div>
 
           </aside>
+        </div>
+
+
+        <div className="learn-callout">
+          <div>
+            <p className="eyebrow">New here?</p>
+            <p className="learn-callout-copy">
+              Review the rules, winning lines, draws, move history, and reset.
+            </p>
+          </div>
+
+          <button
+            ref={learnButtonRef}
+            type="button"
+            className="learn-button"
+            onClick={handleOpenLearnModal}
+            aria-haspopup="dialog"
+            aria-expanded={isLearnModalOpen}
+            aria-controls="learn-modal"
+          >
+            Learn how to play
+          </button>
         </div>
 
         {isLearnModalOpen ? (

@@ -13,6 +13,10 @@ Each phase must have:
 
 Only one feature should be active at a time unless a dependency requires a small supporting change.
 
+When a phase moves to `Done`, add a matching summary file under `specs/done/` so completed work stays easy to review.
+
+The `specs/done/` directory is shared project documentation. It is not agent-only or manually locked to one person. You and the agent can both update it whenever completed feature details need to be recorded.
+
 ## Status Legend
 
 - `Not Started`
@@ -250,4 +254,3 @@ Entry criteria:
 - Records are reliable.
 - Infrastructure costs are understood.
 - Real users justify the feature.
-
