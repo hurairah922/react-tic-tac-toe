@@ -6,6 +6,7 @@ function StatusPanel({
   winner,
   boardSize,
   winLength,
+  startingPlayer,
   xIsNext,
   gameMode,
   cpuDifficulty,
@@ -15,6 +16,11 @@ function StatusPanel({
 }) {
   const isCpuMode = gameMode === "cpu";
   const nextPlayer = xIsNext ? "X" : "O";
+  const startingPlayerLabel = isCpuMode
+    ? startingPlayer === "X"
+      ? "You (X)"
+      : "CPU (O)"
+    : `Player ${startingPlayer}`;
   const cpuDifficultyLabel =
     cpuDifficulty.charAt(0).toUpperCase() + cpuDifficulty.slice(1);
   const lastMoveSummary = lastMoveLocation
@@ -40,6 +46,13 @@ function StatusPanel({
   } else if (isDraw) {
     status = "Draw: no winner";
     detail = "The board is full, so the round ends in a draw.";
+  } else if (currentMove === 0) {
+    status = `Starting player: ${startingPlayerLabel}`;
+    detail = isCpuMode
+      ? startingPlayer === "X"
+        ? "You make the first move in this round."
+        : "CPU makes the first move in this round."
+      : `Player ${startingPlayer} makes the first move in this round.`;
   } else if (isCpuMode) {
     status = isCpuTurn ? "CPU turn" : "Your turn";
     detail = isCpuTurn
@@ -65,6 +78,10 @@ function StatusPanel({
         <div>
           <dt>Current move</dt>
           <dd>#{currentMove}</dd>
+        </div>
+        <div>
+          <dt>Round starter</dt>
+          <dd>{startingPlayerLabel}</dd>
         </div>
         <div>
           <dt>Mode</dt>
