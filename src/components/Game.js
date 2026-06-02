@@ -89,6 +89,25 @@ export default function Game() {
     () => hasRecordedGames(localRecords),
     [localRecords]
   );
+  const boardTurnNotice = useMemo(() => {
+    if (winner) {
+      if (isCpuMode) {
+        return winner === "X" ? "Winner: You (X)" : "Winner: CPU (O)";
+      }
+
+      return `Winner: Player ${winner}`;
+    }
+
+    if (isDraw) {
+      return "Draw: the round ended with no winner.";
+    }
+
+    if (isCpuMode) {
+      return xIsNext ? "Current player: You (X)" : "Current player: CPU (O)";
+    }
+
+    return `Current player: Player ${currentPlayer}`;
+  }, [currentPlayer, isCpuMode, isDraw, winner, xIsNext]);
 
   historyRef.current = history;
   currentMoveRef.current = currentMove;
@@ -405,6 +424,7 @@ export default function Game() {
               isGameOver={isMatchComplete}
               isInteractionDisabled={isCpuTurn}
               isCpuTurn={isCpuTurn}
+              turnNotice={boardTurnNotice}
             />
           </div>
 
