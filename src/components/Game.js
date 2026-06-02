@@ -1,6 +1,7 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Board from "./Board";
 import BoardSizeSelector from "./BoardSizeSelector";
+import GameModeSelector from "./GameModeSelector";
 import LearnModal from "./LearnModal";
 import MoveHistory from "./MoveHistory";
 import StatusPanel from "./StatusPanel";
@@ -12,6 +13,9 @@ import {
   getMoveLocation,
   isBoardFull,
 } from "../utils/gameLogic";
+import { chooseCpuMove } from "../utils/cpuPlayer";
+
+const CPU_MOVE_DELAY_MS = 450;
 
 function createInitialEntry(boardSize) {
   return {
@@ -29,21 +33,61 @@ export default function Game() {
   const [currentMove, setCurrentMove] = useState(0);
   const [isAscending, setIsAscending] = useState(true);
   const [isLearnModalOpen, setIsLearnModalOpen] = useState(false);
+  const [gameMode, setGameMode] = useState("human");
+  const [cpuDifficulty, setCpuDifficulty] = useState("easy");
   const learnButtonRef = useRef(null);
+  const cpuTimeoutRef = useRef(null);
+  const cpuTurnVersionRef = useRef(0);
+  const historyRef = useRef(history);
+  const currentMoveRef = useRef(currentMove);
+  const boardRulesRef = useRef(boardRules);
+  const gameModeRef = useRef(gameMode);
+  const cpuDifficultyRef = useRef(cpuDifficulty);
 
   const currentEntry = history[currentMove];
   const { boardSize, winLength } = boardRules;
   const xIsNext = currentMove % 2 === 0;
+  const isCpuMode = gameMode === "cpu";
 
   const winnerInfo = useMemo(
     () => calculateWinner(currentEntry.squares, boardRules),
     [boardRules, currentEntry.squares]
   );
   const isDraw = !winnerInfo && isBoardFull(currentEntry.squares);
+  const isCpuTurn = isCpuMode && !xIsNext && !winnerInfo && !isDraw;
+
+  historyRef.current = history;
+  currentMoveRef.current = currentMove;
+  boardRulesRef.current = boardRules;
+  gameModeRef.current = gameMode;
+  cpuDifficultyRef.current = cpuDifficulty;
+
+  const invalidatePendingCpuTurn = useCallback(() => {
+    cpuTurnVersionRef.current += 1;
+
+    if (cpuTimeoutRef.current) {
+      window.clearTimeout(cpuTimeoutRef.current);
+      cpuTimeoutRef.current = null;
+    }
+  }, []);
+
+  const resetMatch = useCallback(
+    (nextBoardSize = boardSize) => {
+      setHistory([createInitialEntry(nextBoardSize)]);
+      setCurrentMove(0);
+      setIsAscending(true);
+    },
+    [boardSize]
+  );
 
   const handlePlay = useCallback(
     (squareIndex) => {
-      if (currentEntry.squares[squareIndex] || winnerInfo || isDraw) {
+      if (
+        isCpuTurn ||
+        currentEntry.squares[squareIndex] ||
+        winnerInfo ||
+        isDraw
+      ) {
         return;
       }
 
@@ -71,30 +115,61 @@ export default function Game() {
       currentEntry.squares,
       currentMove,
       history,
+      isCpuTurn,
       isDraw,
       winnerInfo,
       xIsNext,
     ]
   );
 
-  const handleJumpTo = useCallback((nextMove) => {
-    setCurrentMove(nextMove);
-  }, []);
+  const handleJumpTo = useCallback(
+    (nextMove) => {
+      invalidatePendingCpuTurn();
+      setCurrentMove(nextMove);
+    },
+    [invalidatePendingCpuTurn]
+  );
 
   const handleReset = useCallback(() => {
-    setHistory([createInitialEntry(boardSize)]);
-    setCurrentMove(0);
-    setIsAscending(true);
-  }, [boardSize]);
+    invalidatePendingCpuTurn();
+    resetMatch();
+  }, [invalidatePendingCpuTurn, resetMatch]);
 
-  const handleBoardSizeChange = useCallback((nextBoardSize) => {
-    const nextBoardRules = createBoardRules(nextBoardSize);
+  const handleBoardSizeChange = useCallback(
+    (nextBoardSize) => {
+      const nextBoardRules = createBoardRules(nextBoardSize);
 
-    setBoardRules(nextBoardRules);
-    setHistory([createInitialEntry(nextBoardRules.boardSize)]);
-    setCurrentMove(0);
-    setIsAscending(true);
-  }, []);
+      invalidatePendingCpuTurn();
+      setBoardRules(nextBoardRules);
+      resetMatch(nextBoardRules.boardSize);
+    },
+    [invalidatePendingCpuTurn, resetMatch]
+  );
+
+  const handleGameModeChange = useCallback(
+    (nextGameMode) => {
+      if (nextGameMode === gameMode) {
+        return;
+      }
+
+      invalidatePendingCpuTurn();
+      setGameMode(nextGameMode);
+      resetMatch();
+    },
+    [gameMode, invalidatePendingCpuTurn, resetMatch]
+  );
+
+  const handleCpuDifficultyChange = useCallback(
+    (nextCpuDifficulty) => {
+      setCpuDifficulty(nextCpuDifficulty);
+
+      if (isCpuMode) {
+        invalidatePendingCpuTurn();
+        resetMatch();
+      }
+    },
+    [invalidatePendingCpuTurn, isCpuMode, resetMatch]
+  );
 
   const handleToggleSort = useCallback(() => {
     setIsAscending((previousValue) => !previousValue);
@@ -111,6 +186,77 @@ export default function Game() {
     });
   }, []);
 
+  useEffect(() => {
+    if (!isCpuTurn) {
+      invalidatePendingCpuTurn();
+      return undefined;
+    }
+
+    const turnVersion = cpuTurnVersionRef.current;
+
+    cpuTimeoutRef.current = window.setTimeout(() => {
+      if (cpuTurnVersionRef.current !== turnVersion) {
+        return;
+      }
+
+      const latestHistory = historyRef.current;
+      const latestCurrentMove = currentMoveRef.current;
+      const latestEntry = latestHistory[latestCurrentMove];
+      const latestBoardRules = boardRulesRef.current;
+      const latestSquares = latestEntry?.squares;
+
+      if (!latestSquares) {
+        return;
+      }
+
+      const latestWinnerInfo = calculateWinner(latestSquares, latestBoardRules);
+      const latestIsDraw =
+        !latestWinnerInfo && isBoardFull(latestSquares);
+      const latestIsCpuTurn =
+        gameModeRef.current === "cpu" &&
+        latestCurrentMove % 2 === 1 &&
+        !latestWinnerInfo &&
+        !latestIsDraw;
+
+      if (!latestIsCpuTurn) {
+        return;
+      }
+
+      const cpuMove = chooseCpuMove({
+        squares: latestSquares,
+        boardRules: latestBoardRules,
+        difficulty: cpuDifficultyRef.current,
+      });
+
+      if (cpuMove === null || latestSquares[cpuMove]) {
+        return;
+      }
+
+      const nextSquares = latestSquares.slice();
+      nextSquares[cpuMove] = "O";
+
+      const nextHistory = [
+        ...latestHistory.slice(0, latestCurrentMove + 1),
+        {
+          squares: nextSquares,
+          moveLocation: getMoveLocation(cpuMove, latestBoardRules.boardSize),
+          player: "O",
+        },
+      ];
+
+      setHistory(nextHistory);
+      setCurrentMove(nextHistory.length - 1);
+      cpuTimeoutRef.current = null;
+    }, CPU_MOVE_DELAY_MS);
+
+    return () => {
+      if (cpuTimeoutRef.current) {
+        window.clearTimeout(cpuTimeoutRef.current);
+        cpuTimeoutRef.current = null;
+      }
+    };
+  }, [invalidatePendingCpuTurn, isCpuTurn]);
+
   return (
     <main className="app-shell">
       <section className="game-card" aria-label="Tic-tac-toe game">
@@ -121,6 +267,18 @@ export default function Game() {
           boardSize={boardSize}
           winLength={winLength}
           xIsNext={xIsNext}
+          gameMode={gameMode}
+          cpuDifficulty={cpuDifficulty}
+          isCpuTurn={isCpuTurn}
+          lastMovePlayer={currentEntry.player}
+          lastMoveLocation={currentEntry.moveLocation}
+        />
+
+        <GameModeSelector
+          gameMode={gameMode}
+          cpuDifficulty={cpuDifficulty}
+          onGameModeChange={handleGameModeChange}
+          onCpuDifficultyChange={handleCpuDifficultyChange}
         />
 
         <BoardSizeSelector
@@ -136,6 +294,8 @@ export default function Game() {
               onPlay={handlePlay}
               winningLine={winnerInfo?.line ?? []}
               isGameOver={Boolean(winnerInfo) || isDraw}
+              isInteractionDisabled={isCpuTurn}
+              isCpuTurn={isCpuTurn}
             />
           </div>
 

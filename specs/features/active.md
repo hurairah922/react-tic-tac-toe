@@ -1,171 +1,175 @@
-# Active Feature: Board Setup UI
+# Active Feature Spec
 
-## Status
+## Phase 4: CPU Opponent
 
-Active
-
-## Phase
-
-Phase 3: Board Setup UI
+Status: `Active`
 
 ## Goal
 
-Allow users to choose supported board sizes before or during play.
+Add a single-player mode where the user can play against a free local CPU opponent.
 
-This phase exposes the dynamic board rules created in Phase 2 through a simple user-facing setup control.
+The CPU must run fully in the browser. It must not require a backend, API key, paid AI model, server action, or external service.
 
 ## User Value
 
-Players can choose a board size that fits the type of game they want to play:
+Users can play Tic-Tac-Toe alone without needing a second human player.
 
-* `3x3` for the classic quick game.
-* `4x4` for a longer game with more space.
-* `5x5` for a larger board with a 4-in-a-row win condition.
-
-## Scope
-
-Implement:
-
-* A board size selector with supported options:
-
-  * `3x3`
-  * `4x4`
-  * `5x5`
-* Clear UI text that explains the active win condition.
-* A clean match reset when the board size changes.
-* Dynamic board rendering based on selected board size.
-* Dynamic winning-line highlighting for all supported sizes.
-* Dynamic draw detection for all supported sizes.
-* Move coordinates based on selected board size.
-* Responsive layout for larger boards on mobile screens.
-
-## Board Rules
-
-### 3x3
-
-* Board size: `3x3`
-* Total cells: `9`
-* Win condition: `3 in a row`
-
-### 4x4
-
-* Board size: `4x4`
-* Total cells: `16`
-* Win condition: `4 in a row`
-
-### 5x5
-
-* Board size: `5x5`
-* Total cells: `25`
-* Win condition: `4 in a row`
-
-## UX Requirements
-
-* The selected board size must be visible to the user.
-* The active win condition must be explained near the selector or status area.
-* Changing board size must start a clean match.
-* Reset must preserve the selected board size.
-* Controls must be easy to use on desktop and mobile.
-* The board must stay inside the viewport on small screens.
-* The layout must not overflow horizontally.
-* The game must remain beginner-friendly.
-
-## Accessibility Requirements
-
-* Board size controls must have accessible labels.
-* The selected option must be clear for keyboard and screen-reader users.
-* Focus styles must remain visible.
-* Status updates must continue to work with existing `aria-live` behavior.
-* Changing board size must not trap focus or break keyboard navigation.
-
-## Technical Requirements
-
-* Use the existing dynamic board logic from Phase 2.
-* Do not duplicate hardcoded winner logic inside UI components.
-* Keep board-size configuration clear and easy to extend.
-* Preserve immutable game history behavior.
-* Preserve current-move tracking.
-* Preserve future-history truncation after branching.
-* Preserve winner detection.
-* Preserve draw detection.
-* Preserve winning-line highlighting.
-* Preserve reset behavior.
-* Preserve the Learn How to Play modal.
-
-## Suggested Configuration
-
-Use a simple config structure similar to:
-
-```js
-const BOARD_OPTIONS = [
-  { size: 3, winLength: 3, label: "3x3" },
-  { size: 4, winLength: 4, label: "4x4" },
-  { size: 5, winLength: 4, label: "5x5" },
-];
-```
-
-The exact implementation may differ if the existing project structure suggests a cleaner approach.
-
-## Out of Scope
-
-Do not implement:
-
-* CPU opponent.
-* Difficulty levels.
-* Local records.
-* Accounts.
-* Auth.
-* Invite links.
-* Real-time multiplayer.
-* Async multiplayer.
-* Backend services.
-* Leaderboards.
-* Public matchmaking.
-* New dependencies unless absolutely necessary.
+The CPU should feel different across difficulty levels. It should not only pick random moves. Higher difficulty levels should try to win and block the human player.
 
 ## Acceptance Criteria
 
-* User can select `3x3`, `4x4`, or `5x5`.
-* UI explains the current win condition.
+* User can choose Human vs Human or Human vs CPU mode.
+* User can choose CPU difficulty: Easy, Medium, or Hard.
+* CPU makes valid moves only.
+* CPU never plays on an occupied square.
+* CPU only moves when the game is in CPU mode.
+* CPU moves after the human player finishes a valid move.
+* Human cannot make a move during the CPU turn.
+* CPU difficulty behavior differs by level.
+* CPU does not require backend, paid AI, or external API.
+* Starting a new match keeps the selected mode and difficulty unless the user changes them.
 * Changing board size starts a clean match.
-* Reset preserves the selected board size.
-* `3x3` uses 3 in a row.
-* `4x4` uses 4 in a row.
-* `5x5` uses 4 in a row.
-* Winner detection works for all supported board sizes.
-* Winning-line highlighting works for all supported board sizes.
-* Draw detection works for all supported board sizes.
-* Move history works after selecting a board size.
-* Time travel works after selecting a board size.
-* Future-history truncation still works after branching.
-* Learn How to Play modal still works.
-* Layout stays usable on mobile.
-* App builds successfully.
+* Changing game mode starts a clean match.
+* Changing CPU difficulty starts a clean match if CPU mode is active.
+* Existing Human vs Human behavior still works.
 
-## Testing Notes
+## CPU Difficulty Rules
+
+### Easy
+
+Easy CPU should mostly play randomly.
+
+Required behavior:
+
+* Choose a random valid empty square.
+* No win detection required.
+* No blocking required.
+
+### Medium
+
+Medium CPU should make simple tactical decisions.
+
+Required behavior priority:
+
+1. If CPU can win on this move, make the winning move.
+2. Else if the human can win on their next move, block that move.
+3. Else choose a random valid empty square.
+
+### Hard
+
+Hard CPU should play stronger than Medium.
+
+Required behavior priority:
+
+1. If CPU can win on this move, make the winning move.
+2. Else if the human can win on their next move, block that move.
+3. Else prefer the center square if available.
+4. Else prefer a corner square if available.
+5. Else choose a random valid empty square.
+
+For larger boards, use the same idea based on the current win condition.
+
+Supported boards:
+
+* 3 x 3: 3 in a row
+* 4 x 4: 4 in a row
+* 5 x 5: 4 in a row
+
+## Implementation Requirements
+
+* Keep CPU logic local and deterministic where practical.
+* Extract CPU move selection into a small pure function or module.
+* Avoid mixing CPU decision logic directly into render/UI code.
+* Reuse existing winner/win-condition logic where possible.
+* Do not duplicate board evaluation logic if a shared helper can be used.
+* Keep existing game state behavior intact.
+* Do not add persistence in this phase.
+* Do not add local stats/history in this phase.
+* Do not redesign the full UI in this phase.
+* Do not use AI APIs or remote services.
+
+## Suggested State Additions
+
+The implementation may add state similar to:
+
+* `gameMode`: `"human"` or `"cpu"`
+* `cpuDifficulty`: `"easy" | "medium" | "hard"`
+* `isCpuTurn`: derived from current player, game mode, and game status
+
+The exact naming can follow the existing code style.
+
+## UI Requirements
+
+Add controls for:
+
+* Game mode:
+
+  * Human vs Human
+  * Human vs CPU
+
+* CPU difficulty:
+
+  * Easy
+  * Medium
+  * Hard
+
+Difficulty controls should only be shown or enabled when CPU mode is selected.
+
+The status area should clearly show when:
+
+* It is the human player's turn.
+* It is the CPU's turn.
+* The CPU has selected a move.
+* The game is won or drawn.
+
+## Board Interaction Rules
+
+* Human can click empty squares only on a valid human turn.
+* Human cannot click while CPU is choosing or making a move.
+* Human cannot click after the game is over.
+* CPU cannot move after the game is over.
+* CPU cannot make more than one move per turn.
+* CPU should not move if the board changes because of reset, board size change, mode change, or difficulty change.
+
+## Timing
+
+A short CPU delay is allowed to make the turn feel natural.
+
+Recommended delay:
+
+* 300ms to 600ms
+
+The delay must not create duplicate CPU moves or stale moves after reset.
+
+## Testing Checklist
 
 Manual checks:
 
-* Select `3x3` and complete a horizontal win.
-* Select `3x3` and complete a vertical win.
-* Select `3x3` and complete a diagonal win.
-* Select `4x4` and complete a 4-in-row win.
-* Select `5x5` and complete a 4-in-row win.
-* Confirm draw detection works.
-* Confirm winning squares highlight correctly.
-* Confirm reset preserves selected board size.
-* Confirm changing board size clears the current match.
-* Confirm move history works.
-* Confirm time travel works.
-* Confirm branching after time travel removes future moves.
-* Confirm mobile layout does not overflow.
-* Confirm Learn How to Play modal still opens and closes.
+* Human vs Human still works.
+* Human vs CPU mode starts correctly.
+* Easy CPU makes valid random moves.
+* Medium CPU takes winning moves.
+* Medium CPU blocks obvious human wins.
+* Hard CPU takes winning moves.
+* Hard CPU blocks obvious human wins.
+* Hard CPU prefers center when available.
+* Hard CPU prefers corners when center is unavailable.
+* Human cannot click during CPU turn.
+* CPU does not move after reset.
+* CPU does not move after board size change.
+* CPU does not move after game mode change.
+* CPU works on 3 x 3, 4 x 4, and 5 x 5 boards.
+* Win and draw detection still works.
+* Move history still works for the current match.
+* Layout remains usable on mobile.
 
+## Non-Goals
 
-## Phase 3 Polish Notes
-
-- Board size selector options must not show native radio button circles.
-- Selected board size should be shown through custom button/card styling.
-- Board squares must keep a stable 1:1 aspect ratio.
-- Move history growth must not change board square height.
-- 3x3, 4x4, and 5x5 layouts must remain stable on desktop and mobile.
+* Do not add persistent local storage.
+* Do not add match statistics.
+* Do not add full UI refactor.
+* Do not add animations.
+* Do not add online multiplayer.
+* Do not add backend services.
+* Do not add paid AI logic.
+* Do not update the visual design beyond what is needed for the new controls.

@@ -8,6 +8,8 @@ function Board({
   onPlay,
   winningLine,
   isGameOver,
+  isInteractionDisabled,
+  isCpuTurn,
 }) {
   const boardStyle = {
     gridTemplateRows: `repeat(${boardSize}, minmax(0, 1fr))`,
@@ -29,7 +31,9 @@ function Board({
           boardSize={boardSize}
           value={squares[squareIndex]}
           isWinning={isWinningSquare}
-          isDisabled={Boolean(squares[squareIndex]) || isGameOver}
+          isDisabled={
+            Boolean(squares[squareIndex]) || isGameOver || isInteractionDisabled
+          }
           onClick={() => onPlay(squareIndex)}
         />
       );
@@ -46,7 +50,13 @@ function Board({
     <section className="board-card" aria-labelledby="board-heading">
       <div className="board-copy">
         <p className="eyebrow">Board</p>
-        {isGameOver ? <h2 id="board-heading">Game Over</h2> : <h2 id="board-heading">Make your move</h2>}
+        {isGameOver ? (
+          <h2 id="board-heading">Game Over</h2>
+        ) : isCpuTurn ? (
+          <h2 id="board-heading">CPU is thinking</h2>
+        ) : (
+          <h2 id="board-heading">Make your move</h2>
+        )}
       </div>
 
       <div
