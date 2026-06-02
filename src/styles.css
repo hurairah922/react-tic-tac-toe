@@ -618,13 +618,15 @@ button:disabled {
   align-items: center;
   justify-content: center;
   padding: 24px;
+  overflow-y: auto;
   background: rgba(35, 24, 21, 0.42);
   backdrop-filter: blur(12px);
 }
 
 .learn-modal {
   width: min(680px, 100%);
-  max-height: min(760px, calc(100vh - 48px));
+  margin: auto;
+  max-height: min(760px, calc(100dvh - 48px));
   overflow: auto;
   padding: 26px;
   border: 1px solid rgba(255, 255, 255, 0.72);
@@ -852,7 +854,7 @@ button:disabled {
   }
 
   .learn-modal {
-    max-height: calc(100vh - 24px);
+    max-height: calc(100dvh - 24px);
     padding: 20px;
     border-radius: 24px;
   }
