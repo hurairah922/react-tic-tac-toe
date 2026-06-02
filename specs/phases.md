@@ -124,7 +124,7 @@ Acceptance criteria:
 
 ## Phase 4: CPU Opponent
 
-Status: `Active`
+Status: `Done`
 
 Goal:
 
