@@ -141,7 +141,7 @@ Acceptance criteria:
 
 ## Phase 5: Local Records
 
-Status: `Not Started`
+Status: `Done`
 
 Goal:
 
@@ -155,7 +155,25 @@ Acceptance criteria:
 - Records separate board sizes.
 - User can clear local records.
 
-## Phase 6: Optional Accounts
+## Phase 6: Match Flow Improvements
+
+Status: `Not Started`
+
+Goal:
+
+Improve match fairness and post-game flow.
+
+Acceptance criteria:
+
+- Starting player can alternate between matches or be selected randomly.
+- Both players get a fair chance to make the first move across repeated games.
+- The current starting player is clear before the match begins.
+- After a win or draw, a New Game button appears.
+- New Game starts a clean match using the current board size and mode.
+- Mobile layout does not jump or jerk when move history updates.
+- Move history updates without changing the visible board position during play.
+
+## Phase 7: Optional Accounts
 
 Status: `Not Started`
 
@@ -170,7 +188,7 @@ Acceptance criteria:
 - User can have profile name.
 - User can set display name per match.
 
-## Phase 7: Cloud Records
+## Phase 8: Cloud Records
 
 Status: `Not Started`
 
@@ -185,7 +203,7 @@ Acceptance criteria:
 - Match results are validated before saving.
 - Stats separate mode, board size, and difficulty.
 
-## Phase 8: Invite-Link Multiplayer
+## Phase 9: Invite-Link Multiplayer
 
 Status: `Not Started`
 
@@ -201,7 +219,7 @@ Acceptance criteria:
 - Both players have display names.
 - Invalid rooms show clear errors.
 
-## Phase 9: Real-Time Multiplayer
+## Phase 10: Real-Time Multiplayer
 
 Status: `Not Started`
 
@@ -216,7 +234,7 @@ Acceptance criteria:
 - Reconnect works without corrupting game state.
 - Completed match state is saved.
 
-## Phase 10: Async Turn-Based Multiplayer
+## Phase 11: Async Turn-Based Multiplayer
 
 Status: `Not Started`
 
@@ -231,7 +249,7 @@ Acceptance criteria:
 - Starting player may vary between X and O.
 - Completed match is saved.
 
-## Phase 11: Growth Features
+## Phase 12: Growth Features
 
 Status: `Not Started`
 

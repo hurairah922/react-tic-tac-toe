@@ -354,6 +354,7 @@ button:disabled {
 .square:focus-visible,
 .history-button:focus-visible,
 .history-sort-button:focus-visible,
+.clear-records-button:focus-visible,
 .learn-button:focus-visible,
 .modal-close-button:focus-visible,
 .reset-button:focus-visible {
@@ -458,6 +459,47 @@ button:disabled {
 .reset-button:disabled {
   background: #d1c5b7;
   box-shadow: none;
+}
+
+.clear-records-button:disabled {
+  background: rgba(104, 91, 87, 0.12);
+  color: rgba(104, 91, 87, 0.65);
+  box-shadow: none;
+}
+
+.local-records-copy {
+  margin: 16px 0 0;
+  color: var(--muted);
+}
+
+.records-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 18px 0 0;
+}
+
+.records-stats div {
+  min-width: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: rgba(255, 248, 238, 0.74);
+}
+
+.records-stats dt {
+  margin-bottom: 6px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.records-stats dd {
+  margin: 0;
+  font-size: 1.3rem;
+  font-weight: 800;
 }
 
 .history-list {
@@ -706,6 +748,7 @@ button:disabled {
 
   .history-sort-button,
   .learn-button,
+  .clear-records-button,
   .reset-button {
     width: 100%;
     justify-content: center;
@@ -728,7 +771,8 @@ button:disabled {
 
   .board-card,
   .sidebar-card,
-  .status-summary {
+  .status-summary,
+  .records-stats div {
     padding: 18px;
   }
 
@@ -742,6 +786,10 @@ button:disabled {
 
   .square {
     border-radius: 18px;
+  }
+
+  .records-stats {
+    grid-template-columns: 1fr;
   }
 
   .modal-overlay {
