@@ -253,7 +253,7 @@ button:disabled {
   align-items: center;
   justify-content: space-between;
   gap: 18px;
-  margin-bottom: 24px;
+  /* margin-bottom: 24px; */
   padding: 16px 18px;
   border: 1px solid rgba(198, 93, 46, 0.18);
   border-radius: var(--radius-lg);
@@ -272,6 +272,7 @@ button:disabled {
   grid-template-columns: minmax(0, 1.1fr) minmax(300px, 0.9fr);
   gap: 24px;
   align-items: start;
+  margin-bottom: 24px;
 }
 
 .board-panel,
