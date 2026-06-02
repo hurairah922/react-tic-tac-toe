@@ -1,4 +1,5 @@
 import { memo, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { DEFAULT_BOARD_RULES } from "../utils/gameLogic";
 
 const FOCUSABLE_SELECTOR = [
@@ -88,7 +89,7 @@ function LearnModal({ boardRules = DEFAULT_BOARD_RULES, onClose }) {
     }
   }
 
-  return (
+  return createPortal(
     <div className="modal-overlay" onMouseDown={handleOverlayMouseDown}>
       <section
         id="learn-modal"
@@ -210,7 +211,8 @@ function LearnModal({ boardRules = DEFAULT_BOARD_RULES, onClose }) {
           </div>
         </section>
       </section>
-    </div>
+    </div>,
+    document.body
   );
 }
 

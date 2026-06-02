@@ -10,6 +10,7 @@ function Board({
   isGameOver,
   isInteractionDisabled,
   isCpuTurn,
+  turnNotice,
 }) {
   const boardStyle = {
     gridTemplateRows: `repeat(${boardSize}, minmax(0, 1fr))`,
@@ -67,6 +68,10 @@ function Board({
       >
         {rows}
       </div>
+
+      <p className="board-turn-notice" aria-live="polite">
+        {turnNotice}
+      </p>
     </section>
   );
 }

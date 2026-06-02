@@ -16,6 +16,7 @@
   --highlight-soft: rgba(24, 128, 93, 0.14);
   --focus: #0f766e;
   --board-size: min(78vw, 360px);
+  --history-panel-height: clamp(220px, 28vh, 360px);
   --radius-xl: 28px;
   --radius-lg: 20px;
   --radius-md: 14px;
@@ -312,6 +313,14 @@ button:disabled {
   margin: 0 auto;
 }
 
+.board-turn-notice {
+  margin: 18px 0 0;
+  text-align: center;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
 .board-row {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -357,6 +366,7 @@ button:disabled {
 .clear-records-button:focus-visible,
 .learn-button:focus-visible,
 .modal-close-button:focus-visible,
+.new-game-button:focus-visible,
 .reset-button:focus-visible {
   outline: 3px solid var(--focus);
   outline-offset: 3px;
@@ -408,17 +418,32 @@ button:disabled {
   padding: 20px;
 }
 
-.sidebar-header,
-.sidebar-actions {
+.sidebar-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 14px;
 }
 
+.sidebar-actions {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.sidebar-action-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  width: 100%;
+  /* justify-content: flex-end; */
+  gap: 10px;
+}
+
 .history-sort-button,
 .learn-button,
 .modal-close-button,
+.new-game-button,
 .reset-button {
   min-height: 46px;
   padding: 0 16px;
@@ -449,6 +474,18 @@ button:disabled {
   color: #fffaf5;
   font-weight: 700;
   box-shadow: 0 14px 30px rgba(198, 93, 46, 0.24);
+}
+
+.new-game-button {
+  background: var(--highlight);
+  color: #f7fffb;
+  font-weight: 700;
+  box-shadow: 0 14px 30px rgba(24, 128, 93, 0.24);
+}
+
+.new-game-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  background: #0f6a4c;
 }
 
 .reset-button:hover:not(:disabled) {
@@ -502,8 +539,25 @@ button:disabled {
   font-weight: 800;
 }
 
+.history-card {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.history-scroll-region {
+  min-height: var(--history-panel-height);
+  max-height: var(--history-panel-height);
+  margin-top: 18px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  overflow-anchor: none;
+  padding-right: 4px;
+  scrollbar-gutter: stable;
+}
+
 .history-list {
-  margin: 18px 0 0;
+  margin: 0;
   padding: 0;
   list-style: none;
   display: grid;
@@ -564,13 +618,15 @@ button:disabled {
   align-items: center;
   justify-content: center;
   padding: 24px;
+  overflow-y: auto;
   background: rgba(35, 24, 21, 0.42);
   backdrop-filter: blur(12px);
 }
 
 .learn-modal {
   width: min(680px, 100%);
-  max-height: min(760px, calc(100vh - 48px));
+  margin: auto;
+  max-height: min(760px, calc(100dvh - 48px));
   overflow: auto;
   padding: 26px;
   border: 1px solid rgba(255, 255, 255, 0.72);
@@ -748,6 +804,7 @@ button:disabled {
 
   .history-sort-button,
   .learn-button,
+  .new-game-button,
   .clear-records-button,
   .reset-button {
     width: 100%;
@@ -793,12 +850,11 @@ button:disabled {
   }
 
   .modal-overlay {
-    align-items: flex-end;
     padding: 12px;
   }
 
   .learn-modal {
-    max-height: calc(100vh - 24px);
+    max-height: calc(100dvh - 24px);
     padding: 20px;
     border-radius: 24px;
   }
@@ -814,5 +870,38 @@ button:disabled {
 
   .modal-close-button {
     width: 100%;
+  }
+}
+
+@media (max-width: 475px) {
+  :root {
+    --history-panel-height: 240px;
+  }
+
+  .app-shell {
+    align-items: stretch;
+    padding: 18px 12px;
+  }
+
+  .game-card {
+    padding: 18px 16px;
+  }
+
+  .board-card,
+  .sidebar-card {
+    padding: 16px;
+  }
+
+  .game-layout {
+    gap: 18px;
+  }
+
+  .board-grid,
+  .board-row {
+    gap: 8px;
+  }
+
+  .square {
+    border-radius: 18px;
   }
 }

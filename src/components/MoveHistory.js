@@ -9,56 +9,58 @@ function MoveHistory({ history, currentMove, isAscending, onJumpTo }) {
   }, [history, isAscending]);
 
   return (
-    <ol className="history-list">
-      {orderedMoves.map((move) => {
-        const entry = history[move];
-        const isCurrentMove = move === currentMove;
-        const locationText = entry.moveLocation
-          ? ` (${entry.moveLocation.row}, ${entry.moveLocation.col})`
-          : "";
+    <div className="history-scroll-region" aria-label="Move history">
+      <ol className="history-list">
+        {orderedMoves.map((move) => {
+          const entry = history[move];
+          const isCurrentMove = move === currentMove;
+          const locationText = entry.moveLocation
+            ? ` (${entry.moveLocation.row}, ${entry.moveLocation.col})`
+            : "";
 
-        const moveLabel =
-          move === 0 ? "Go to game start" : `Go to move #${move}${locationText}`;
+          const moveLabel =
+            move === 0 ? "Go to game start" : `Go to move #${move}${locationText}`;
 
-        const currentLabel =
-          move === 0 ? "You are at move #0" : `You are at move #${move}`;
+          const currentLabel =
+            move === 0 ? "You are at move #0" : `You are at move #${move}`;
 
-        return (
-          <li key={move} className="history-entry">
-            {isCurrentMove ? (
-              <div
-                className="history-current"
-                aria-current="step"
-                aria-label={currentLabel}
-              >
-                <span>{currentLabel}</span>
-                {entry.player ? (
-                  <span className="history-meta">
-                    {entry.player} played at row {entry.moveLocation.row}, column{" "}
-                    {entry.moveLocation.col}
-                  </span>
-                ) : (
-                  <span className="history-meta">Initial board state</span>
-                )}
-              </div>
-            ) : (
-              <button
-                type="button"
-                className="history-button"
-                onClick={() => onJumpTo(move)}
-              >
-                <span>{moveLabel}</span>
-                {entry.player ? (
-                  <span className="history-meta">Played by {entry.player}</span>
-                ) : (
-                  <span className="history-meta">Initial board state</span>
-                )}
-              </button>
-            )}
-          </li>
-        );
-      })}
-    </ol>
+          return (
+            <li key={move} className="history-entry">
+              {isCurrentMove ? (
+                <div
+                  className="history-current"
+                  aria-current="step"
+                  aria-label={currentLabel}
+                >
+                  <span>{currentLabel}</span>
+                  {entry.player ? (
+                    <span className="history-meta">
+                      {entry.player} played at row {entry.moveLocation.row}, column{" "}
+                      {entry.moveLocation.col}
+                    </span>
+                  ) : (
+                    <span className="history-meta">Initial board state</span>
+                  )}
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="history-button"
+                  onClick={() => onJumpTo(move)}
+                >
+                  <span>{moveLabel}</span>
+                  {entry.player ? (
+                    <span className="history-meta">Played by {entry.player}</span>
+                  ) : (
+                    <span className="history-meta">Initial board state</span>
+                  )}
+                </button>
+              )}
+            </li>
+          );
+        })}
+      </ol>
+    </div>
   );
 }
 

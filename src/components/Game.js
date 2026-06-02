@@ -23,6 +23,11 @@ import {
   getMoveLocation,
   isBoardFull,
 } from "../utils/gameLogic";
+import {
+  DEFAULT_STARTING_PLAYER,
+  getAlternatePlayer,
+  getPlayerForMove,
+} from "../utils/matchFlow";
 import { chooseCpuMove } from "../utils/cpuPlayer";
 
 const CPU_MOVE_DELAY_MS = 450;
@@ -41,6 +46,10 @@ export default function Game() {
     createInitialEntry(DEFAULT_BOARD_RULES.boardSize),
   ]);
   const [currentMove, setCurrentMove] = useState(0);
+  const [startingPlayer, setStartingPlayer] = useState(DEFAULT_STARTING_PLAYER);
+  const [nextStartingPlayer, setNextStartingPlayer] = useState(
+    DEFAULT_STARTING_PLAYER
+  );
   const [isAscending, setIsAscending] = useState(true);
   const [isLearnModalOpen, setIsLearnModalOpen] = useState(false);
   const [gameMode, setGameMode] = useState("human");
@@ -57,10 +66,12 @@ export default function Game() {
   const boardRulesRef = useRef(boardRules);
   const gameModeRef = useRef(gameMode);
   const cpuDifficultyRef = useRef(cpuDifficulty);
+  const startingPlayerRef = useRef(startingPlayer);
 
   const currentEntry = history[currentMove];
   const { boardSize, winLength } = boardRules;
-  const xIsNext = currentMove % 2 === 0;
+  const currentPlayer = getPlayerForMove(startingPlayer, currentMove);
+  const xIsNext = currentPlayer === "X";
   const isCpuMode = gameMode === "cpu";
 
   const winnerInfo = useMemo(
@@ -78,12 +89,32 @@ export default function Game() {
     () => hasRecordedGames(localRecords),
     [localRecords]
   );
+  const boardTurnNotice = useMemo(() => {
+    if (winner) {
+      if (isCpuMode) {
+        return winner === "X" ? "Winner: You (X)" : "Winner: CPU (O)";
+      }
+
+      return `Winner: Player ${winner}`;
+    }
+
+    if (isDraw) {
+      return "Draw: the round ended with no winner.";
+    }
+
+    if (isCpuMode) {
+      return xIsNext ? "Current player: You (X)" : "Current player: CPU (O)";
+    }
+
+    return `Current player: Player ${currentPlayer}`;
+  }, [currentPlayer, isCpuMode, isDraw, winner, xIsNext]);
 
   historyRef.current = history;
   currentMoveRef.current = currentMove;
   boardRulesRef.current = boardRules;
   gameModeRef.current = gameMode;
   cpuDifficultyRef.current = cpuDifficulty;
+  startingPlayerRef.current = startingPlayer;
 
   const invalidatePendingCpuTurn = useCallback(() => {
     cpuTurnVersionRef.current += 1;
@@ -95,15 +126,22 @@ export default function Game() {
   }, []);
 
   const resetMatch = useCallback(
-    (nextBoardSize = boardSize) => {
+    ({
+      nextBoardSize = boardSize,
+      nextStarter = startingPlayer,
+      resetSort = true,
+    } = {}) => {
       activeMatchIdRef.current += 1;
       recordedMatchIdRef.current = null;
       matchWasTimeTraveledRef.current = false;
+      setStartingPlayer(nextStarter);
       setHistory([createInitialEntry(nextBoardSize)]);
       setCurrentMove(0);
-      setIsAscending(true);
+      if (resetSort) {
+        setIsAscending(true);
+      }
     },
-    [boardSize]
+    [boardSize, startingPlayer]
   );
 
   const handlePlay = useCallback(
@@ -118,7 +156,7 @@ export default function Game() {
       }
 
       const nextSquares = currentEntry.squares.slice();
-      const player = xIsNext ? "X" : "O";
+      const player = currentPlayer;
 
       nextSquares[squareIndex] = player;
 
@@ -138,13 +176,13 @@ export default function Game() {
     },
     [
       boardSize,
+      currentPlayer,
       currentEntry.squares,
       currentMove,
       history,
       isCpuTurn,
       isDraw,
       winnerInfo,
-      xIsNext,
     ]
   );
 
@@ -162,13 +200,22 @@ export default function Game() {
     resetMatch();
   }, [invalidatePendingCpuTurn, resetMatch]);
 
+  const handleNewGame = useCallback(() => {
+    invalidatePendingCpuTurn();
+    resetMatch({ nextStarter: nextStartingPlayer });
+  }, [invalidatePendingCpuTurn, nextStartingPlayer, resetMatch]);
+
   const handleBoardSizeChange = useCallback(
     (nextBoardSize) => {
       const nextBoardRules = createBoardRules(nextBoardSize);
 
       invalidatePendingCpuTurn();
       setBoardRules(nextBoardRules);
-      resetMatch(nextBoardRules.boardSize);
+      setNextStartingPlayer(DEFAULT_STARTING_PLAYER);
+      resetMatch({
+        nextBoardSize: nextBoardRules.boardSize,
+        nextStarter: DEFAULT_STARTING_PLAYER,
+      });
     },
     [invalidatePendingCpuTurn, resetMatch]
   );
@@ -181,7 +228,8 @@ export default function Game() {
 
       invalidatePendingCpuTurn();
       setGameMode(nextGameMode);
-      resetMatch();
+      setNextStartingPlayer(DEFAULT_STARTING_PLAYER);
+      resetMatch({ nextStarter: DEFAULT_STARTING_PLAYER });
     },
     [gameMode, invalidatePendingCpuTurn, resetMatch]
   );
@@ -253,11 +301,14 @@ export default function Game() {
       }
 
       const latestWinnerInfo = calculateWinner(latestSquares, latestBoardRules);
-      const latestIsDraw =
-        !latestWinnerInfo && isBoardFull(latestSquares);
+      const latestIsDraw = !latestWinnerInfo && isBoardFull(latestSquares);
+      const latestCurrentPlayer = getPlayerForMove(
+        startingPlayerRef.current,
+        latestCurrentMove
+      );
       const latestIsCpuTurn =
         gameModeRef.current === "cpu" &&
-        latestCurrentMove % 2 === 1 &&
+        latestCurrentPlayer === "O" &&
         !latestWinnerInfo &&
         !latestIsDraw;
 
@@ -318,6 +369,7 @@ export default function Game() {
     }
 
     recordedMatchIdRef.current = activeMatchIdRef.current;
+    setNextStartingPlayer(getAlternatePlayer(startingPlayer));
     setLocalRecords((previousRecords) =>
       saveLocalRecords(
         updateRecordsForResult(previousRecords, {
@@ -328,7 +380,9 @@ export default function Game() {
         })
       )
     );
-  }, [boardSize, currentMove, gameMode, history.length, isDraw, winner]);
+  }, [boardSize, currentMove, gameMode, history.length, isDraw, startingPlayer, winner]);
+
+  const isMatchComplete = Boolean(winnerInfo) || isDraw;
 
   return (
     <main className="app-shell">
@@ -339,6 +393,7 @@ export default function Game() {
           winner={winner}
           boardSize={boardSize}
           winLength={winLength}
+          startingPlayer={startingPlayer}
           xIsNext={xIsNext}
           gameMode={gameMode}
           cpuDifficulty={cpuDifficulty}
@@ -366,9 +421,10 @@ export default function Game() {
               boardSize={boardSize}
               onPlay={handlePlay}
               winningLine={winnerInfo?.line ?? []}
-              isGameOver={Boolean(winnerInfo) || isDraw}
+              isGameOver={isMatchComplete}
               isInteractionDisabled={isCpuTurn}
               isCpuTurn={isCpuTurn}
+              turnNotice={boardTurnNotice}
             />
           </div>
 
@@ -376,17 +432,29 @@ export default function Game() {
             <div className="sidebar-card sidebar-actions">
               <div>
                 <p className="eyebrow">Controls</p>
-                <h2>Start again</h2>
+                <h2>{isMatchComplete ? "Next round" : "Start again"}</h2>
               </div>
 
-              <button
-                type="button"
-                className="reset-button"
-                onClick={handleReset}
-                disabled={history.length === 1}
-              >
-                Reset Game
-              </button>
+              <div className="sidebar-action-buttons">
+                {isMatchComplete ? (
+                  <button
+                    type="button"
+                    className="new-game-button"
+                    onClick={handleNewGame}
+                  >
+                    New Game
+                  </button>
+                ) : null}
+
+                <button
+                  type="button"
+                  className="reset-button"
+                  onClick={handleReset}
+                  disabled={history.length === 1}
+                >
+                  Reset Game
+                </button>
+              </div>
             </div>
 
             <LocalRecordsPanel
@@ -397,7 +465,7 @@ export default function Game() {
               isClearDisabled={!canClearLocalRecords}
             />
 
-            <div className="sidebar-card">
+            <div className="sidebar-card history-card">
               <div className="sidebar-header">
                 <div>
                   <p className="eyebrow">History</p>
