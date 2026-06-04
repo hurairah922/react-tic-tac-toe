@@ -6,10 +6,9 @@ import {
 
 function BoardSizeSelector({ boardRules, onBoardSizeChange }) {
   return (
-    <section className="board-setup" aria-labelledby="board-setup-title">
-      <div className="board-setup-copy">
-        <p className="eyebrow">Board setup</p>
-        <h2 id="board-setup-title">Choose your board</h2>
+    <section className="setup-section" aria-labelledby="board-setup-title">
+      <div className="setup-section-copy">
+        <h3 id="board-setup-title">Choose your board</h3>
         <p>
           Current rule: get {boardRules.winLength} in a row on a{" "}
           {boardRules.boardSize} x {boardRules.boardSize} board to win.

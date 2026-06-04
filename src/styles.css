@@ -169,14 +169,6 @@ button:disabled {
   font-weight: 700;
 }
 
-.setup-layout {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
-  align-items: start;
-  margin-bottom: 18px;
-}
-
 .board-setup {
   display: grid;
   gap: 16px;
@@ -196,6 +188,35 @@ button:disabled {
 }
 
 .board-setup-copy p:last-child {
+  margin: 8px 0 0;
+  color: var(--muted);
+}
+
+.game-setup-panel {
+  margin-bottom: 18px;
+}
+
+.setup-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 18px;
+  align-items: start;
+}
+
+.setup-section {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.setup-section-copy h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+
+.setup-section-copy p {
   margin: 8px 0 0;
   color: var(--muted);
 }
