@@ -40,17 +40,16 @@ function GameModeSelector({
   const isCpuMode = gameMode === "cpu";
 
   return (
-    <section className="board-setup" aria-labelledby="game-mode-title">
-      <div className="board-setup-copy">
-        <p className="eyebrow">Match setup</p>
-        <h2 id="game-mode-title">Choose who plays</h2>
+    <section className="setup-section" aria-labelledby="game-mode-title">
+      <div className="setup-section-copy">
+        <h3 id="game-mode-title">Choose who plays</h3>
         <p>
           Switch between local two-player play and a browser-only CPU opponent.
         </p>
       </div>
 
       <fieldset
-        className="board-size-options"
+        className="board-size-options game-mode-options"
         style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}
       >
         <legend>Game mode</legend>

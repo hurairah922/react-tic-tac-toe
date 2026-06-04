@@ -397,19 +397,29 @@ export default function Game() {
           </div>
         </header>
 
-        <div className="setup-layout">
-          <GameModeSelector
-            gameMode={gameMode}
-            cpuDifficulty={cpuDifficulty}
-            onGameModeChange={handleGameModeChange}
-            onCpuDifficultyChange={handleCpuDifficultyChange}
-          />
+        <section className="board-setup game-setup-panel" aria-labelledby="game-setup-title">
+          <div className="board-setup-copy">
+            <p className="eyebrow">Game setup</p>
+            <h2 id="game-setup-title">Choose your match settings</h2>
+            <p>
+              Pick who plays and the board size before jumping into the round.
+            </p>
+          </div>
 
-          <BoardSizeSelector
-            boardRules={boardRules}
-            onBoardSizeChange={handleBoardSizeChange}
-          />
-        </div>
+          <div className="setup-layout">
+            <GameModeSelector
+              gameMode={gameMode}
+              cpuDifficulty={cpuDifficulty}
+              onGameModeChange={handleGameModeChange}
+              onCpuDifficultyChange={handleCpuDifficultyChange}
+            />
+
+            <BoardSizeSelector
+              boardRules={boardRules}
+              onBoardSizeChange={handleBoardSizeChange}
+            />
+          </div>
+        </section>
 
         <div className="primary-layout">
           <div className="board-panel">
