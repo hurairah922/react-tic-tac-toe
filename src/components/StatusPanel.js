@@ -63,13 +63,9 @@ function StatusPanel({
   }
 
   return (
-    <header className="status-panel">
-      <div>
-        <p className="eyebrow">A Modern</p>
-        <h1>Tic-Tac-Toe</h1>
-      </div>
-
+    <section className="status-panel" aria-label="Game status">
       <div className="status-summary" aria-live="polite">
+        <p className="eyebrow">Round status</p>
         <p className="status-text">{status}</p>
         <p className="status-detail">{detail}</p>
       </div>
@@ -104,7 +100,7 @@ function StatusPanel({
           <dd>{winLength} in a row</dd>
         </div>
       </dl>
-    </header>
+    </section>
   );
 }
 

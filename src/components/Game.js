@@ -52,7 +52,7 @@ export default function Game() {
   );
   const [isAscending, setIsAscending] = useState(true);
   const [isLearnModalOpen, setIsLearnModalOpen] = useState(false);
-  const [gameMode, setGameMode] = useState("human");
+  const [gameMode, setGameMode] = useState("cpu");
   const [cpuDifficulty, setCpuDifficulty] = useState("easy");
   const [localRecords, setLocalRecords] = useState(() => loadLocalRecords());
   const learnButtonRef = useRef(null);
@@ -387,34 +387,31 @@ export default function Game() {
   return (
     <main className="app-shell">
       <section className="game-card" aria-label="Tic-tac-toe game">
-        <StatusPanel
-          currentMove={currentMove}
-          isDraw={isDraw}
-          winner={winner}
-          boardSize={boardSize}
-          winLength={winLength}
-          startingPlayer={startingPlayer}
-          xIsNext={xIsNext}
-          gameMode={gameMode}
-          cpuDifficulty={cpuDifficulty}
-          isCpuTurn={isCpuTurn}
-          lastMovePlayer={currentEntry.player}
-          lastMoveLocation={currentEntry.moveLocation}
-        />
+        <header className="game-header">
+          <div>
+            <p className="eyebrow">A Modern</p>
+            <h1>Tic-Tac-Toe</h1>
+            <p className="game-header-copy">
+              Choose a mode, pick a board, and jump straight into the round.
+            </p>
+          </div>
+        </header>
 
-        <GameModeSelector
-          gameMode={gameMode}
-          cpuDifficulty={cpuDifficulty}
-          onGameModeChange={handleGameModeChange}
-          onCpuDifficultyChange={handleCpuDifficultyChange}
-        />
+        <div className="setup-layout">
+          <GameModeSelector
+            gameMode={gameMode}
+            cpuDifficulty={cpuDifficulty}
+            onGameModeChange={handleGameModeChange}
+            onCpuDifficultyChange={handleCpuDifficultyChange}
+          />
 
-        <BoardSizeSelector
-          boardRules={boardRules}
-          onBoardSizeChange={handleBoardSizeChange}
-        />
+          <BoardSizeSelector
+            boardRules={boardRules}
+            onBoardSizeChange={handleBoardSizeChange}
+          />
+        </div>
 
-        <div className="game-layout">
+        <div className="primary-layout">
           <div className="board-panel">
             <Board
               squares={currentEntry.squares}
@@ -428,23 +425,41 @@ export default function Game() {
             />
           </div>
 
-          <aside className="sidebar">
-            <div className="sidebar-card sidebar-actions">
+          <aside className="primary-sidebar">
+            <StatusPanel
+              currentMove={currentMove}
+              isDraw={isDraw}
+              winner={winner}
+              boardSize={boardSize}
+              winLength={winLength}
+              startingPlayer={startingPlayer}
+              xIsNext={xIsNext}
+              gameMode={gameMode}
+              cpuDifficulty={cpuDifficulty}
+              isCpuTurn={isCpuTurn}
+              lastMovePlayer={currentEntry.player}
+              lastMoveLocation={currentEntry.moveLocation}
+            />
+
+            <section className="sidebar-card sidebar-actions" aria-label="Round actions">
               <div>
                 <p className="eyebrow">Controls</p>
                 <h2>{isMatchComplete ? "Next round" : "Start again"}</h2>
               </div>
 
               <div className="sidebar-action-buttons">
-                {isMatchComplete ? (
-                  <button
-                    type="button"
-                    className="new-game-button"
-                    onClick={handleNewGame}
-                  >
-                    New Game
-                  </button>
-                ) : null}
+                <button
+                  type="button"
+                  className={`new-game-button${
+                    isMatchComplete ? "" : " action-button-hidden"
+                  }`}
+                  onClick={handleNewGame}
+                  disabled={!isMatchComplete}
+                  aria-hidden={!isMatchComplete}
+                  tabIndex={isMatchComplete ? 0 : -1}
+                >
+                  New Game
+                </button>
 
                 <button
                   type="button"
@@ -455,16 +470,12 @@ export default function Game() {
                   Reset Game
                 </button>
               </div>
-            </div>
+            </section>
+          </aside>
+        </div>
 
-            <LocalRecordsPanel
-              gameMode={gameMode}
-              boardSize={boardSize}
-              records={currentRecordBucket}
-              onClear={handleClearRecords}
-              isClearDisabled={!canClearLocalRecords}
-            />
-
+        <div className="secondary-layout">
+          <div className="secondary-main">
             <div className="sidebar-card history-card">
               <div className="sidebar-header">
                 <div>
@@ -492,30 +503,38 @@ export default function Game() {
                 onJumpTo={handleJumpTo}
               />
             </div>
-
-          </aside>
-        </div>
-
-
-        <div className="learn-callout">
-          <div>
-            <p className="eyebrow">New here?</p>
-            <p className="learn-callout-copy">
-              Review the rules, winning lines, draws, move history, and reset.
-            </p>
           </div>
 
-          <button
-            ref={learnButtonRef}
-            type="button"
-            className="learn-button"
-            onClick={handleOpenLearnModal}
-            aria-haspopup="dialog"
-            aria-expanded={isLearnModalOpen}
-            aria-controls="learn-modal"
-          >
-            Learn how to play
-          </button>
+          <aside className="secondary-sidebar">
+            <LocalRecordsPanel
+              gameMode={gameMode}
+              boardSize={boardSize}
+              records={currentRecordBucket}
+              onClear={handleClearRecords}
+              isClearDisabled={!canClearLocalRecords}
+            />
+
+            <div className="learn-callout">
+              <div>
+                <p className="eyebrow">New here?</p>
+                <p className="learn-callout-copy">
+                  Review the rules, winning lines, draws, move history, and reset.
+                </p>
+              </div>
+
+              <button
+                ref={learnButtonRef}
+                type="button"
+                className="learn-button"
+                onClick={handleOpenLearnModal}
+                aria-haspopup="dialog"
+                aria-expanded={isLearnModalOpen}
+                aria-controls="learn-modal"
+              >
+                Learn how to play
+              </button>
+            </div>
+          </aside>
         </div>
 
         {isLearnModalOpen ? (

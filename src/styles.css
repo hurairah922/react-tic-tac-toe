@@ -63,14 +63,14 @@ button:disabled {
 .app-shell {
   min-height: 100vh;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  padding: 32px 20px;
+  padding: 20px 20px 36px;
 }
 
 .game-card {
-  width: min(1100px, 100%);
-  padding: 28px;
+  width: min(1180px, 100%);
+  padding: 24px;
   border: 1px solid rgba(255, 255, 255, 0.65);
   border-radius: var(--radius-xl);
   background: var(--surface);
@@ -78,10 +78,10 @@ button:disabled {
   box-shadow: var(--shadow);
 }
 
-.status-panel {
+.game-header {
   display: grid;
-  gap: 18px;
-  margin-bottom: 28px;
+  gap: 10px;
+  margin-bottom: 18px;
 }
 
 .eyebrow {
@@ -93,7 +93,7 @@ button:disabled {
   color: var(--accent);
 }
 
-.status-panel h1,
+.game-header h1,
 .board-copy h2,
 .sidebar-header h2,
 .sidebar-actions h2 {
@@ -102,8 +102,19 @@ button:disabled {
   letter-spacing: -0.04em;
 }
 
-.status-panel h1 {
-  font-size: clamp(2.4rem, 5vw, 4rem);
+.game-header h1 {
+  font-size: clamp(2.2rem, 4.5vw, 3.6rem);
+}
+
+.game-header-copy {
+  margin: 0;
+  max-width: 42rem;
+  color: var(--muted);
+}
+
+.status-panel {
+  display: grid;
+  gap: 14px;
 }
 
 .status-summary {
@@ -111,6 +122,9 @@ button:disabled {
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   background: var(--surface-strong);
+  min-height: 144px;
+  display: grid;
+  align-content: start;
 }
 
 .status-text {
@@ -132,6 +146,7 @@ button:disabled {
 }
 
 .status-stats div {
+  flex: 1 1 140px;
   min-width: 120px;
   padding: 14px 16px;
   border: 1px solid var(--line);
@@ -154,10 +169,17 @@ button:disabled {
   font-weight: 700;
 }
 
+.setup-layout {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  align-items: start;
+  margin-bottom: 18px;
+}
+
 .board-setup {
   display: grid;
   gap: 16px;
-  margin-bottom: 24px;
   padding: 18px;
   border: 1px solid rgba(24, 128, 93, 0.18);
   border-radius: var(--radius-lg);
@@ -254,7 +276,6 @@ button:disabled {
   align-items: center;
   justify-content: space-between;
   gap: 18px;
-  /* margin-bottom: 24px; */
   padding: 16px 18px;
   border: 1px solid rgba(198, 93, 46, 0.18);
   border-radius: var(--radius-lg);
@@ -268,18 +289,33 @@ button:disabled {
   color: var(--muted);
 }
 
-.game-layout {
+.primary-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(300px, 0.9fr);
+  grid-template-columns: minmax(0, 1.1fr) minmax(280px, 360px);
   gap: 24px;
   align-items: start;
   margin-bottom: 24px;
 }
 
+.secondary-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
+  gap: 24px;
+  align-items: start;
+}
+
 .board-panel,
-.sidebar {
+.primary-sidebar,
+.secondary-main,
+.secondary-sidebar {
   min-width: 0;
   align-self: start;
+}
+
+.primary-sidebar,
+.secondary-sidebar {
+  display: grid;
+  gap: 18px;
 }
 
 .board-card,
@@ -409,11 +445,6 @@ button:disabled {
   letter-spacing: 0.08em;
 }
 
-.sidebar {
-  display: grid;
-  gap: 18px;
-}
-
 .sidebar-card {
   padding: 20px;
 }
@@ -436,8 +467,12 @@ button:disabled {
   display: flex;
   flex-wrap: wrap;
   width: 100%;
-  /* justify-content: flex-end; */
   gap: 10px;
+}
+
+.sidebar-action-buttons > * {
+  flex: 1 1 140px;
+  min-width: 0;
 }
 
 .history-sort-button,
@@ -449,6 +484,7 @@ button:disabled {
   padding: 0 16px;
   border: 1px solid transparent;
   border-radius: 999px;
+  text-align: center;
   transition:
     transform 180ms ease,
     box-shadow 180ms ease,
@@ -467,6 +503,11 @@ button:disabled {
 .history-sort-button:hover {
   transform: translateY(-1px);
   box-shadow: 0 10px 20px rgba(198, 93, 46, 0.14);
+}
+
+.action-button-hidden {
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .reset-button {
@@ -785,7 +826,9 @@ button:disabled {
 }
 
 @media (max-width: 900px) {
-  .game-layout {
+  .setup-layout,
+  .primary-layout,
+  .secondary-layout {
     grid-template-columns: 1fr;
   }
 
@@ -818,12 +861,16 @@ button:disabled {
 
 @media (max-width: 640px) {
   .app-shell {
-    padding: 18px 14px;
+    padding: 14px 14px 28px;
   }
 
   .game-card {
     padding: 18px;
     border-radius: 24px;
+  }
+
+  .game-header {
+    margin-bottom: 16px;
   }
 
   .board-card,
@@ -833,12 +880,14 @@ button:disabled {
     padding: 18px;
   }
 
-  .status-panel {
-    margin-bottom: 20px;
+  .status-summary {
+    min-height: 0;
   }
 
-  .learn-callout {
-    margin-bottom: 20px;
+  .setup-layout,
+  .primary-layout,
+  .secondary-layout {
+    gap: 18px;
   }
 
   .square {
@@ -890,10 +939,6 @@ button:disabled {
   .board-card,
   .sidebar-card {
     padding: 16px;
-  }
-
-  .game-layout {
-    gap: 18px;
   }
 
   .board-grid,
