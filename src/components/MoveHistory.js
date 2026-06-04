@@ -1,6 +1,12 @@
 import { memo, useMemo } from "react";
 
-function MoveHistory({ history, currentMove, isAscending, onJumpTo }) {
+function MoveHistory({
+  history,
+  currentMove,
+  isAscending,
+  onJumpTo,
+  playerDisplayNames,
+}) {
   const orderedMoves = useMemo(() => {
     const indexes = history.map((_, move) => move);
     // Reverse only the rendered move list so the underlying history indexes
@@ -35,8 +41,8 @@ function MoveHistory({ history, currentMove, isAscending, onJumpTo }) {
                   <span>{currentLabel}</span>
                   {entry.player ? (
                     <span className="history-meta">
-                      {entry.player} played at row {entry.moveLocation.row}, column{" "}
-                      {entry.moveLocation.col}
+                      {playerDisplayNames[entry.player]} ({entry.player}) played at row{" "}
+                      {entry.moveLocation.row}, column {entry.moveLocation.col}
                     </span>
                   ) : (
                     <span className="history-meta">Initial board state</span>
@@ -50,7 +56,9 @@ function MoveHistory({ history, currentMove, isAscending, onJumpTo }) {
                 >
                   <span>{moveLabel}</span>
                   {entry.player ? (
-                    <span className="history-meta">Played by {entry.player}</span>
+                    <span className="history-meta">
+                      Played by {playerDisplayNames[entry.player]} ({entry.player})
+                    </span>
                   ) : (
                     <span className="history-meta">Initial board state</span>
                   )}

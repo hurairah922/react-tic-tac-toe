@@ -9,11 +9,11 @@
     "eject": "react-scripts eject"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.107.0",
     "react": "^19.2.1",
     "react-dom": "^19.2.1",
     "react-scripts": "^5.0.0"
   },
-  "devDependencies": {},
   "browserslist": {
     "production": [
       ">0.2%",
