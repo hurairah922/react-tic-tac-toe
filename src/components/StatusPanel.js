@@ -13,51 +13,42 @@ function StatusPanel({
   isCpuTurn,
   lastMovePlayer,
   lastMoveLocation,
+  playerDisplayNames,
 }) {
   const isCpuMode = gameMode === "cpu";
   const nextPlayer = xIsNext ? "X" : "O";
-  const startingPlayerLabel = isCpuMode
-    ? startingPlayer === "X"
-      ? "You (X)"
-      : "CPU (O)"
-    : `Player ${startingPlayer}`;
+  const startingPlayerLabel = `${playerDisplayNames[startingPlayer]} (${startingPlayer})`;
   const cpuDifficultyLabel =
     cpuDifficulty.charAt(0).toUpperCase() + cpuDifficulty.slice(1);
   const lastMoveSummary = lastMoveLocation
-    ? `${
-        isCpuMode && lastMovePlayer === "O" ? "CPU" : `Player ${lastMovePlayer}`
-      } played row ${lastMoveLocation.row}, column ${lastMoveLocation.col}.`
+    ? `${playerDisplayNames[lastMovePlayer]} (${lastMovePlayer}) played row ${
+        lastMoveLocation.row
+      }, column ${lastMoveLocation.col}.`
     : null;
 
-  let status = `Next player: ${nextPlayer}`;
+  let status = `Next player: ${playerDisplayNames[nextPlayer]} (${nextPlayer})`;
   let detail =
     currentMove === 0
       ? "Choose an empty square to begin the round."
       : "Choose an empty square to continue.";
 
   if (winner) {
-    status =
-      isCpuMode && winner === "X"
-        ? "You win!"
-        : isCpuMode && winner === "O"
-        ? "CPU wins!"
-        : `Winner: ${winner}`;
+    status = `Winner: ${playerDisplayNames[winner]} (${winner})`;
     detail = "The winning line is highlighted on the board.";
   } else if (isDraw) {
-    status = "Draw: no winner";
+    status = `Draw: ${playerDisplayNames.X} and ${playerDisplayNames.O}`;
     detail = "The board is full, so the round ends in a draw.";
   } else if (currentMove === 0) {
     status = `Starting player: ${startingPlayerLabel}`;
-    detail = isCpuMode
-      ? startingPlayer === "X"
-        ? "You make the first move in this round."
-        : "CPU makes the first move in this round."
-      : `Player ${startingPlayer} makes the first move in this round.`;
+    detail = `${playerDisplayNames[startingPlayer]} makes the first move in this round.`;
   } else if (isCpuMode) {
-    status = isCpuTurn ? "CPU turn" : "Your turn";
+    status = isCpuTurn
+      ? `${playerDisplayNames.O} turn`
+      : `${playerDisplayNames.X} turn`;
     detail = isCpuTurn
-      ? "CPU is choosing a move. The board is locked until it finishes."
-      : lastMoveSummary ?? "You are X. Choose an empty square to continue.";
+      ? `${playerDisplayNames.O} is choosing a move. The board is locked until it finishes.`
+      : lastMoveSummary ??
+        `${playerDisplayNames.X} is playing as X. Choose an empty square to continue.`;
   } else if (lastMoveSummary) {
     detail = `${lastMoveSummary} ${detail}`;
   }

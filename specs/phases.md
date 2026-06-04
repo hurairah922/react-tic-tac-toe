@@ -175,7 +175,7 @@ Acceptance criteria:
 
 ## Phase 7: Optional Accounts
 
-Status: `Not Started`
+Status: `Active`
 
 Goal:
 

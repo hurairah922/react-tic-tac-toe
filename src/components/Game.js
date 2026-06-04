@@ -1,11 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import AccountPanel from "./AccountPanel";
 import Board from "./Board";
 import BoardSizeSelector from "./BoardSizeSelector";
 import GameModeSelector from "./GameModeSelector";
 import LearnModal from "./LearnModal";
 import LocalRecordsPanel from "./LocalRecordsPanel";
+import MatchDisplayNamePanel from "./MatchDisplayNamePanel";
 import MoveHistory from "./MoveHistory";
 import StatusPanel from "./StatusPanel";
+import {
+  getInitialAuthState,
+  loadAuthState,
+  saveProfileNameAsync,
+  signOutAsync,
+  signInWithEmail,
+  subscribeToAuthState,
+} from "../services/authService";
 import {
   clearLocalRecords,
   createDefaultLocalRecords,
@@ -28,6 +38,12 @@ import {
   getAlternatePlayer,
   getPlayerForMove,
 } from "../utils/matchFlow";
+import {
+  DISPLAY_NAME_LIMIT,
+  createDefaultMatchDisplayNames,
+  formatPlayerLabel,
+  normalizeDisplayName,
+} from "../utils/playerIdentity";
 import { chooseCpuMove } from "../utils/cpuPlayer";
 
 const CPU_MOVE_DELAY_MS = 450;
@@ -40,7 +56,28 @@ function createInitialEntry(boardSize) {
   };
 }
 
+function createMatchNameCustomizationState() {
+  return {
+    cpu: { X: false, O: false },
+    human: { X: false, O: false },
+  };
+}
+
+function syncMatchDisplayNames(previousNames, customizedNames, defaultNames) {
+  return {
+    cpu: {
+      X: customizedNames.cpu.X ? previousNames.cpu.X : defaultNames.cpu.X,
+      O: customizedNames.cpu.O ? previousNames.cpu.O : defaultNames.cpu.O,
+    },
+    human: {
+      X: customizedNames.human.X ? previousNames.human.X : defaultNames.human.X,
+      O: customizedNames.human.O ? previousNames.human.O : defaultNames.human.O,
+    },
+  };
+}
+
 export default function Game() {
+  const initialAuthState = useMemo(() => getInitialAuthState(), []);
   const [boardRules, setBoardRules] = useState(DEFAULT_BOARD_RULES);
   const [history, setHistory] = useState(() => [
     createInitialEntry(DEFAULT_BOARD_RULES.boardSize),
@@ -55,6 +92,17 @@ export default function Game() {
   const [gameMode, setGameMode] = useState("cpu");
   const [cpuDifficulty, setCpuDifficulty] = useState("easy");
   const [localRecords, setLocalRecords] = useState(() => loadLocalRecords());
+  const [authUser, setAuthUser] = useState(initialAuthState.authUser);
+  const [profileName, setProfileName] = useState(initialAuthState.profileName);
+  const [authStatusMessage, setAuthStatusMessage] = useState("");
+  const [authErrorMessage, setAuthErrorMessage] = useState("");
+  const [isAuthBusy, setIsAuthBusy] = useState(false);
+  const [customizedNames, setCustomizedNames] = useState(
+    createMatchNameCustomizationState
+  );
+  const [matchDisplayNames, setMatchDisplayNames] = useState(() =>
+    createDefaultMatchDisplayNames(initialAuthState)
+  );
   const learnButtonRef = useRef(null);
   const cpuTimeoutRef = useRef(null);
   const cpuTurnVersionRef = useRef(0);
@@ -81,6 +129,32 @@ export default function Game() {
   const winner = winnerInfo?.winner ?? null;
   const isDraw = !winnerInfo && isBoardFull(currentEntry.squares);
   const isCpuTurn = isCpuMode && !xIsNext && !winnerInfo && !isDraw;
+  const defaultMatchDisplayNames = useMemo(
+    () => createDefaultMatchDisplayNames({ authUser, profileName }),
+    [authUser, profileName]
+  );
+  const resolvedMatchDisplayNames = useMemo(
+    () => ({
+      cpu: {
+        X:
+          normalizeDisplayName(matchDisplayNames.cpu.X) ||
+          defaultMatchDisplayNames.cpu.X,
+        O:
+          normalizeDisplayName(matchDisplayNames.cpu.O) ||
+          defaultMatchDisplayNames.cpu.O,
+      },
+      human: {
+        X:
+          normalizeDisplayName(matchDisplayNames.human.X) ||
+          defaultMatchDisplayNames.human.X,
+        O:
+          normalizeDisplayName(matchDisplayNames.human.O) ||
+          defaultMatchDisplayNames.human.O,
+      },
+    }),
+    [defaultMatchDisplayNames, matchDisplayNames]
+  );
+  const playerDisplayNames = resolvedMatchDisplayNames[gameMode];
   const currentRecordBucket = useMemo(
     () => getRecordBucket(localRecords, { gameMode, boardSize }),
     [boardSize, gameMode, localRecords]
@@ -91,23 +165,18 @@ export default function Game() {
   );
   const boardTurnNotice = useMemo(() => {
     if (winner) {
-      if (isCpuMode) {
-        return winner === "X" ? "Winner: You (X)" : "Winner: CPU (O)";
-      }
-
-      return `Winner: Player ${winner}`;
+      return `Winner: ${formatPlayerLabel(playerDisplayNames[winner], winner)}`;
     }
 
     if (isDraw) {
-      return "Draw: the round ended with no winner.";
+      return `Draw: ${playerDisplayNames.X} and ${playerDisplayNames.O} filled the board.`;
     }
 
-    if (isCpuMode) {
-      return xIsNext ? "Current player: You (X)" : "Current player: CPU (O)";
-    }
-
-    return `Current player: Player ${currentPlayer}`;
-  }, [currentPlayer, isCpuMode, isDraw, winner, xIsNext]);
+    return `Current player: ${formatPlayerLabel(
+      playerDisplayNames[currentPlayer],
+      currentPlayer
+    )}`;
+  }, [currentPlayer, isDraw, playerDisplayNames, winner]);
 
   historyRef.current = history;
   currentMoveRef.current = currentMove;
@@ -277,6 +346,214 @@ export default function Game() {
     setLocalRecords(createDefaultLocalRecords());
   }, []);
 
+  const applyAuthState = useCallback((nextAuthState) => {
+    setAuthUser(nextAuthState?.authUser ?? null);
+    setProfileName(nextAuthState?.profileName ?? "");
+  }, []);
+
+  const handleSaveProfileName = useCallback(
+    async (nextProfileName) => {
+      if (!authUser) {
+        return;
+      }
+
+      setIsAuthBusy(true);
+      setAuthErrorMessage("");
+
+      try {
+        const result = await saveProfileNameAsync(authUser, nextProfileName);
+        applyAuthState(result);
+        setAuthStatusMessage(result.message ?? "Profile updated.");
+      } catch (error) {
+        setAuthErrorMessage(
+          error?.message ||
+            "Could not save your profile name. Guest play is still available."
+        );
+      } finally {
+        setIsAuthBusy(false);
+      }
+    },
+    [applyAuthState, authUser]
+  );
+
+  const handleSignIn = useCallback(
+    async (email) => {
+      setIsAuthBusy(true);
+      setAuthErrorMessage("");
+
+      try {
+        const result = await signInWithEmail(email);
+
+        if (result?.authUser !== undefined || result?.profileName !== undefined) {
+          applyAuthState(result);
+        }
+
+        setAuthStatusMessage(
+          result?.message ||
+            "Sign-in started. Guest play is still available while you continue."
+        );
+      } catch (error) {
+        setAuthErrorMessage(
+          error?.message ||
+            "Could not start sign-in. You can keep playing as a guest."
+        );
+      } finally {
+        setIsAuthBusy(false);
+      }
+    },
+    [applyAuthState]
+  );
+
+  const handleSignOut = useCallback(async () => {
+    setIsAuthBusy(true);
+    setAuthErrorMessage("");
+
+    try {
+      const result = await signOutAsync();
+      applyAuthState(result);
+      setAuthStatusMessage(
+        result.message || "Signed out. Guest play is still available."
+      );
+    } catch (error) {
+      setAuthErrorMessage(
+        error?.message || "Could not sign out right now. Please try again."
+      );
+    } finally {
+      setIsAuthBusy(false);
+    }
+  }, [applyAuthState]);
+
+  const handleDisplayNameChange = useCallback(
+    (mode, player, nextValue) => {
+      const safeValue = nextValue.slice(0, DISPLAY_NAME_LIMIT);
+      const defaultValue = defaultMatchDisplayNames[mode][player];
+      const isCustomized =
+        safeValue === ""
+          ? true
+          : normalizeDisplayName(safeValue) !== normalizeDisplayName(defaultValue);
+
+      setMatchDisplayNames((previousNames) => ({
+        ...previousNames,
+        [mode]: {
+          ...previousNames[mode],
+          [player]: safeValue,
+        },
+      }));
+      setCustomizedNames((previousState) => ({
+        ...previousState,
+        [mode]: {
+          ...previousState[mode],
+          [player]: isCustomized,
+        },
+      }));
+    },
+    [defaultMatchDisplayNames]
+  );
+
+  const handleDisplayNameBlur = useCallback(
+    (mode, player) => {
+      const currentValue = matchDisplayNames[mode][player];
+      const defaultValue = defaultMatchDisplayNames[mode][player];
+      const normalizedValue = normalizeDisplayName(currentValue);
+      const resolvedValue = normalizedValue || defaultValue;
+
+      setMatchDisplayNames((previousNames) => ({
+        ...previousNames,
+        [mode]: {
+          ...previousNames[mode],
+          [player]: resolvedValue,
+        },
+      }));
+      setCustomizedNames((previousState) => ({
+        ...previousState,
+        [mode]: {
+          ...previousState[mode],
+          [player]:
+            normalizedValue !== "" &&
+            normalizedValue !== normalizeDisplayName(defaultValue),
+        },
+      }));
+    },
+    [defaultMatchDisplayNames, matchDisplayNames]
+  );
+
+  const handleDisplayNameReset = useCallback(
+    (mode, player) => {
+      const defaultValue = defaultMatchDisplayNames[mode][player];
+
+      setMatchDisplayNames((previousNames) => ({
+        ...previousNames,
+        [mode]: {
+          ...previousNames[mode],
+          [player]: defaultValue,
+        },
+      }));
+      setCustomizedNames((previousState) => ({
+        ...previousState,
+        [mode]: {
+          ...previousState[mode],
+          [player]: false,
+        },
+      }));
+    },
+    [defaultMatchDisplayNames]
+  );
+
+  useEffect(() => {
+    setMatchDisplayNames((previousNames) =>
+      syncMatchDisplayNames(
+        previousNames,
+        customizedNames,
+        defaultMatchDisplayNames
+      )
+    );
+  }, [customizedNames, defaultMatchDisplayNames]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    loadAuthState()
+      .then((nextAuthState) => {
+        if (!isMounted) {
+          return;
+        }
+
+        applyAuthState(nextAuthState);
+      })
+      .catch((error) => {
+        if (!isMounted) {
+          return;
+        }
+
+        setAuthErrorMessage(
+          error?.message ||
+            "Could not load account details. Guest play is still available."
+        );
+      });
+
+    const unsubscribe = subscribeToAuthState((nextAuthState, event) => {
+      if (!isMounted) {
+        return;
+      }
+
+      applyAuthState(nextAuthState);
+      setAuthErrorMessage("");
+
+      if (event === "SIGNED_IN") {
+        setAuthStatusMessage("Signed in successfully.");
+      } else if (event === "SIGNED_OUT") {
+        setAuthStatusMessage("Signed out. Guest play is still available.");
+      } else if (event === "USER_UPDATED") {
+        setAuthStatusMessage("Profile name saved.");
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
+  }, [applyAuthState]);
+
   useEffect(() => {
     if (!isCpuTurn) {
       invalidatePendingCpuTurn();
@@ -395,6 +672,17 @@ export default function Game() {
               Choose a mode, pick a board, and jump straight into the round.
             </p>
           </div>
+
+          <AccountPanel
+            authUser={authUser}
+            profileName={profileName}
+            onSignIn={handleSignIn}
+            onSignOut={handleSignOut}
+            onSaveProfileName={handleSaveProfileName}
+            authStatusMessage={authStatusMessage}
+            authErrorMessage={authErrorMessage}
+            isAuthBusy={isAuthBusy}
+          />
         </header>
 
         <section className="board-setup game-setup-panel" aria-labelledby="game-setup-title">
@@ -417,6 +705,16 @@ export default function Game() {
             <BoardSizeSelector
               boardRules={boardRules}
               onBoardSizeChange={handleBoardSizeChange}
+            />
+
+            <MatchDisplayNamePanel
+              gameMode={gameMode}
+              matchDisplayNames={matchDisplayNames}
+              defaultMatchDisplayNames={defaultMatchDisplayNames}
+              customizedNames={customizedNames}
+              onDisplayNameChange={handleDisplayNameChange}
+              onDisplayNameBlur={handleDisplayNameBlur}
+              onDisplayNameReset={handleDisplayNameReset}
             />
           </div>
         </section>
@@ -449,6 +747,7 @@ export default function Game() {
               isCpuTurn={isCpuTurn}
               lastMovePlayer={currentEntry.player}
               lastMoveLocation={currentEntry.moveLocation}
+              playerDisplayNames={playerDisplayNames}
             />
 
             <section className="sidebar-card sidebar-actions" aria-label="Round actions">
@@ -511,6 +810,7 @@ export default function Game() {
                 currentMove={currentMove}
                 isAscending={isAscending}
                 onJumpTo={handleJumpTo}
+                playerDisplayNames={playerDisplayNames}
               />
             </div>
           </div>

@@ -80,7 +80,9 @@ button:disabled {
 
 .game-header {
   display: grid;
-  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
+  gap: 18px;
+  align-items: start;
   margin-bottom: 18px;
 }
 
@@ -110,6 +112,148 @@ button:disabled {
   margin: 0;
   max-width: 42rem;
   color: var(--muted);
+}
+
+.account-panel {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid rgba(24, 128, 93, 0.16);
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(236, 247, 244, 0.92)),
+    var(--surface-strong);
+}
+
+.account-panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.account-panel h2 {
+  margin: 0;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-size: 1.45rem;
+}
+
+.account-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(104, 91, 87, 0.12);
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.account-badge-active {
+  background: var(--highlight-soft);
+  color: #195640;
+}
+
+.account-copy,
+.display-name-copy {
+  margin: 0;
+  color: var(--muted);
+}
+
+.account-form {
+  display: grid;
+  gap: 12px;
+}
+
+.account-field {
+  display: grid;
+  gap: 8px;
+}
+
+.account-field span {
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.account-field input {
+  width: 100%;
+  min-width: 0;
+  min-height: 46px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255, 253, 249, 0.94);
+  color: var(--text);
+}
+
+.account-field input:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+}
+
+.account-actions,
+.display-name-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.account-actions > * {
+  flex: 1 1 140px;
+}
+
+.account-sign-out-button,
+.display-name-reset-button {
+  min-height: 46px;
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 248, 238, 0.86);
+  color: var(--text);
+  font-weight: 700;
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    background-color 180ms ease,
+    border-color 180ms ease;
+}
+
+.account-sign-out-button:hover:not(:disabled),
+.display-name-reset-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: rgba(198, 93, 46, 0.26);
+  box-shadow: 0 10px 20px rgba(198, 93, 46, 0.12);
+}
+
+.account-sign-out-button:focus-visible,
+.display-name-reset-button:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+}
+
+.display-name-reset-button:disabled {
+  color: rgba(104, 91, 87, 0.58);
+  background: rgba(104, 91, 87, 0.08);
+  box-shadow: none;
+}
+
+.account-error {
+  margin: 0;
+  color: #a9441d;
+  font-weight: 700;
+}
+
+.account-status {
+  margin: 0;
+  color: #195640;
+  font-weight: 700;
 }
 
 .status-panel {
@@ -198,7 +342,7 @@ button:disabled {
 
 .setup-layout {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 18px;
   align-items: start;
 }
@@ -288,6 +432,27 @@ button:disabled {
 }
 
 .board-size-rule {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.display-name-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.display-name-card {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: rgba(255, 253, 249, 0.82);
+}
+
+.display-name-default {
   color: var(--muted);
   font-size: 0.9rem;
 }
@@ -424,7 +589,9 @@ button:disabled {
 .learn-button:focus-visible,
 .modal-close-button:focus-visible,
 .new-game-button:focus-visible,
-.reset-button:focus-visible {
+.reset-button:focus-visible,
+.account-sign-out-button:focus-visible,
+.display-name-reset-button:focus-visible {
   outline: 3px solid var(--focus);
   outline-offset: 3px;
 }
@@ -500,7 +667,9 @@ button:disabled {
 .learn-button,
 .modal-close-button,
 .new-game-button,
-.reset-button {
+.reset-button,
+.account-sign-out-button,
+.display-name-reset-button {
   min-height: 46px;
   padding: 0 16px;
   border: 1px solid transparent;
@@ -853,6 +1022,7 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 
+  .game-header,
   .learn-callout,
   .board-setup,
   .sidebar-header,
@@ -866,11 +1036,17 @@ button:disabled {
     width: 100%;
   }
 
+  .display-name-grid {
+    grid-template-columns: 1fr;
+  }
+
   .history-sort-button,
   .learn-button,
   .new-game-button,
   .clear-records-button,
-  .reset-button {
+  .reset-button,
+  .account-sign-out-button,
+  .display-name-reset-button {
     width: 100%;
     justify-content: center;
   }
@@ -909,6 +1085,11 @@ button:disabled {
   .primary-layout,
   .secondary-layout {
     gap: 18px;
+  }
+
+  .account-panel,
+  .display-name-card {
+    padding: 16px;
   }
 
   .square {
