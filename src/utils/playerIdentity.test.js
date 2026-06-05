@@ -59,6 +59,23 @@ describe("playerIdentity", () => {
         O: LOCAL_PLAYER_O_NAME,
       },
     });
+
+    expect(
+      createDefaultMatchDisplayNames({
+        authUser: { email: "riley@example.com" },
+        profileName: "Riley",
+        cpuPlayerSymbol: "X",
+      })
+    ).toEqual({
+      cpu: {
+        X: CPU_PLAYER_NAME,
+        O: "Riley",
+      },
+      human: {
+        X: "Riley",
+        O: LOCAL_PLAYER_O_NAME,
+      },
+    });
   });
 
   test("formats labels with both display name and board marker", () => {

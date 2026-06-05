@@ -7,6 +7,7 @@ create table if not exists public.match_history (
   mode text not null,
   board_size integer not null,
   difficulty text null,
+  human_symbol text null,
 
   result text not null,
   winner text null,
@@ -29,6 +30,9 @@ create table if not exists public.match_history (
   constraint match_history_difficulty_check
     check (difficulty is null or difficulty in ('easy', 'medium', 'hard')),
 
+  constraint match_history_human_symbol_check
+    check (human_symbol is null or human_symbol in ('X', 'O')),
+
   constraint match_history_result_check
     check (result in ('x_win', 'o_win', 'draw')),
 
@@ -43,6 +47,13 @@ create table if not exists public.match_history (
       (mode = 'cpu' and difficulty in ('easy', 'medium', 'hard'))
       or
       (mode <> 'cpu' and difficulty is null)
+    ),
+
+  constraint match_history_cpu_symbol_check
+    check (
+      (mode = 'cpu' and human_symbol in ('X', 'O'))
+      or
+      (mode <> 'cpu' and human_symbol is null)
     )
 );
 

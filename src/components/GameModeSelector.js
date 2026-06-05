@@ -31,11 +31,26 @@ const CPU_DIFFICULTY_OPTIONS = [
   },
 ];
 
+const CPU_SYMBOL_OPTIONS = [
+  {
+    value: "O",
+    label: "Play as X",
+    detail: "You move with crosses and the CPU takes noughts.",
+  },
+  {
+    value: "X",
+    label: "Play as O",
+    detail: "You move with noughts and the CPU takes crosses.",
+  },
+];
+
 function GameModeSelector({
   gameMode,
   cpuDifficulty,
+  cpuPlayerSymbol,
   onGameModeChange,
   onCpuDifficultyChange,
+  onCpuPlayerSymbolChange,
 }) {
   const isCpuMode = gameMode === "cpu";
 
@@ -81,34 +96,65 @@ function GameModeSelector({
       </fieldset>
 
       {isCpuMode ? (
-        <fieldset className="board-size-options">
-          <legend>CPU difficulty</legend>
-          {CPU_DIFFICULTY_OPTIONS.map((option) => {
-            const optionId = `cpu-difficulty-${option.value}`;
-            const isSelected = cpuDifficulty === option.value;
+        <>
+          <fieldset className="board-size-options">
+            <legend>Choose your symbol</legend>
+            {CPU_SYMBOL_OPTIONS.map((option) => {
+              const optionId = `cpu-symbol-${option.value.toLowerCase()}`;
+              const isSelected = cpuPlayerSymbol === option.value;
 
-            return (
-              <label
-                className={`board-size-option${
-                  isSelected ? " board-size-option-selected" : ""
-                }`}
-                htmlFor={optionId}
-                key={option.value}
-              >
-                <input
-                  id={optionId}
-                  type="radio"
-                  name="cpu-difficulty"
-                  value={option.value}
-                  checked={isSelected}
-                  onChange={() => onCpuDifficultyChange(option.value)}
-                />
-                <span className="board-size-label">{option.label}</span>
-                <span className="board-size-rule">{option.detail}</span>
-              </label>
-            );
-          })}
-        </fieldset>
+              return (
+                <label
+                  className={`board-size-option${
+                    isSelected ? " board-size-option-selected" : ""
+                  }`}
+                  htmlFor={optionId}
+                  key={option.value}
+                >
+                  <input
+                    id={optionId}
+                    type="radio"
+                    name="cpu-symbol"
+                    value={option.value}
+                    checked={isSelected}
+                    onChange={() => onCpuPlayerSymbolChange(option.value)}
+                  />
+                  <span className="board-size-label">{option.label}</span>
+                  <span className="board-size-rule">{option.detail}</span>
+                </label>
+              );
+            })}
+          </fieldset>
+
+          <fieldset className="board-size-options">
+            <legend>CPU difficulty</legend>
+            {CPU_DIFFICULTY_OPTIONS.map((option) => {
+              const optionId = `cpu-difficulty-${option.value}`;
+              const isSelected = cpuDifficulty === option.value;
+
+              return (
+                <label
+                  className={`board-size-option${
+                    isSelected ? " board-size-option-selected" : ""
+                  }`}
+                  htmlFor={optionId}
+                  key={option.value}
+                >
+                  <input
+                    id={optionId}
+                    type="radio"
+                    name="cpu-difficulty"
+                    value={option.value}
+                    checked={isSelected}
+                    onChange={() => onCpuDifficultyChange(option.value)}
+                  />
+                  <span className="board-size-label">{option.label}</span>
+                  <span className="board-size-rule">{option.detail}</span>
+                </label>
+              );
+            })}
+          </fieldset>
+        </>
       ) : null}
     </section>
   );

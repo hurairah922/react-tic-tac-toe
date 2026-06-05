@@ -25,6 +25,8 @@ function applyMatchResult(records, matchRecord) {
     boardSize: matchRecord.board_size,
     winner: matchRecord.winner,
     isDraw: matchRecord.result === "draw",
+    humanPlayer: matchRecord.human_symbol ?? "X",
+    cpuPlayer: (matchRecord.human_symbol ?? "X") === "X" ? "O" : "X",
   });
 }
 

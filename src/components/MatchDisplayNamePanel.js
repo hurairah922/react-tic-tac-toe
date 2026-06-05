@@ -2,6 +2,7 @@ import { memo } from "react";
 
 function MatchDisplayNamePanel({
   gameMode,
+  cpuPlayerSymbol,
   matchDisplayNames,
   defaultMatchDisplayNames,
   customizedNames,
@@ -10,19 +11,20 @@ function MatchDisplayNamePanel({
   onDisplayNameReset,
 }) {
   const isCpuMode = gameMode === "cpu";
+  const humanPlayerSymbol = cpuPlayerSymbol === "X" ? "O" : "X";
   const activeNames = matchDisplayNames[gameMode];
   const activeDefaults = defaultMatchDisplayNames[gameMode];
   const activeCustomization = customizedNames[gameMode];
   const fields = isCpuMode
     ? [
         {
-          player: "X",
-          title: "Human player",
-          description: "Shown for turns, wins, and move history.",
+          player: humanPlayerSymbol,
+          title: `Human player (${humanPlayerSymbol})`,
+          description: `Shown for turns, wins, and move history on the ${humanPlayerSymbol} side.`,
         },
         {
-          player: "O",
-          title: "CPU opponent",
+          player: cpuPlayerSymbol,
+          title: `CPU opponent (${cpuPlayerSymbol})`,
           description: "Defaults to CPU and can be renamed for the match.",
         },
       ]

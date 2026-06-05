@@ -137,6 +137,8 @@ export function createValidatedMatchRecord({
   gameMode,
   boardSize,
   cpuDifficulty,
+  humanPlayer = null,
+  cpuPlayer = null,
   winner,
   isDraw,
   finalSquares,
@@ -149,6 +151,10 @@ export function createValidatedMatchRecord({
   const difficulty = normalizeDifficulty(mode, cpuDifficulty);
   const result = normalizeResult({ winner, isDraw });
   const normalizedWinner = normalizeWinner(result, winner);
+  const normalizedHumanPlayer =
+    humanPlayer === "X" || humanPlayer === "O" ? humanPlayer : null;
+  const normalizedCpuPlayer =
+    cpuPlayer === "X" || cpuPlayer === "O" ? cpuPlayer : null;
 
   if (!mode || !Number.isInteger(safeBoardSize) || !result) {
     return null;
@@ -159,6 +165,18 @@ export function createValidatedMatchRecord({
   }
 
   if (mode !== "cpu" && cpuDifficulty != null) {
+    return null;
+  }
+
+  if (mode === "cpu") {
+    if (
+      !normalizedHumanPlayer ||
+      !normalizedCpuPlayer ||
+      normalizedHumanPlayer === normalizedCpuPlayer
+    ) {
+      return null;
+    }
+  } else if (humanPlayer != null || cpuPlayer != null) {
     return null;
   }
 
@@ -188,6 +206,7 @@ export function createValidatedMatchRecord({
     mode,
     board_size: safeBoardSize,
     difficulty,
+    human_symbol: mode === "cpu" ? normalizedHumanPlayer : null,
     result,
     winner: normalizedWinner,
     player_x_name: normalizeName(playerDisplayNames?.X),

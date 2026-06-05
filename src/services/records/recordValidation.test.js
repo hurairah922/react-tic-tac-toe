@@ -6,6 +6,8 @@ describe("recordValidation", () => {
       gameMode: "cpu",
       boardSize: 3,
       cpuDifficulty: "medium",
+      humanPlayer: "X",
+      cpuPlayer: "O",
       winner: "X",
       isDraw: false,
       finalSquares: ["X", "X", "X", "O", "O", null, null, null, null],
@@ -24,11 +26,12 @@ describe("recordValidation", () => {
     });
 
     expect(matchRecord).toEqual({
-      mode: "cpu",
-      board_size: 3,
-      difficulty: "medium",
-      result: "x_win",
-      winner: "X",
+        mode: "cpu",
+        board_size: 3,
+        difficulty: "medium",
+        human_symbol: "X",
+        result: "x_win",
+        winner: "X",
       player_x_name: "Alex",
       player_o_name: "CPU",
       move_count: 5,
@@ -62,10 +65,33 @@ describe("recordValidation", () => {
         gameMode: "cpu",
         boardSize: 3,
         cpuDifficulty: "expert",
+        humanPlayer: "X",
+        cpuPlayer: "O",
         winner: "X",
         isDraw: false,
         finalSquares: ["X", "X", "X", "O", "O", null, null, null, null],
         playerDisplayNames: { X: "Riley", O: "CPU" },
+        moves: [
+          { player: "X", row: 1, col: 1, squareIndex: 0 },
+          { player: "O", row: 2, col: 1, squareIndex: 3 },
+          { player: "X", row: 1, col: 2, squareIndex: 1 },
+          { player: "O", row: 2, col: 2, squareIndex: 4 },
+          { player: "X", row: 1, col: 3, squareIndex: 2 },
+        ],
+      })
+    ).toBeNull();
+
+    expect(
+      createValidatedMatchRecord({
+        gameMode: "cpu",
+        boardSize: 3,
+        cpuDifficulty: "easy",
+        humanPlayer: "O",
+        cpuPlayer: "O",
+        winner: "O",
+        isDraw: false,
+        finalSquares: ["X", "X", "X", "O", "O", null, null, null, null],
+        playerDisplayNames: { X: "CPU", O: "Riley" },
         moves: [
           { player: "X", row: 1, col: 1, squareIndex: 0 },
           { player: "O", row: 2, col: 1, squareIndex: 3 },

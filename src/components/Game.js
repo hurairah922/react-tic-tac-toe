@@ -66,6 +66,17 @@ function createMatchNameCustomizationState() {
   };
 }
 
+function getHumanPlayerSymbol(cpuPlayerSymbol) {
+  return cpuPlayerSymbol === "X" ? "O" : "X";
+}
+
+function swapCpuMarkerValues(markerValues) {
+  return {
+    X: markerValues.O,
+    O: markerValues.X,
+  };
+}
+
 function syncMatchDisplayNames(previousNames, customizedNames, defaultNames) {
   return {
     cpu: {
@@ -94,6 +105,7 @@ export default function Game() {
   const [isLearnModalOpen, setIsLearnModalOpen] = useState(false);
   const [gameMode, setGameMode] = useState("cpu");
   const [cpuDifficulty, setCpuDifficulty] = useState("easy");
+  const [cpuPlayerSymbol, setCpuPlayerSymbol] = useState("O");
   const [authUser, setAuthUser] = useState(initialAuthState.authUser);
   const [profileName, setProfileName] = useState(initialAuthState.profileName);
   const [authStatusMessage, setAuthStatusMessage] = useState("");
@@ -122,6 +134,8 @@ export default function Game() {
   const boardRulesRef = useRef(boardRules);
   const gameModeRef = useRef(gameMode);
   const cpuDifficultyRef = useRef(cpuDifficulty);
+  const cpuPlayerSymbolRef = useRef(cpuPlayerSymbol);
+  const humanPlayerSymbolRef = useRef(getHumanPlayerSymbol(cpuPlayerSymbol));
   const startingPlayerRef = useRef(startingPlayer);
   const authUserRef = useRef(authUser);
   const recordsRef = useRef(recordsState.records);
@@ -132,6 +146,7 @@ export default function Game() {
   const currentPlayer = getPlayerForMove(startingPlayer, currentMove);
   const xIsNext = currentPlayer === "X";
   const isCpuMode = gameMode === "cpu";
+  const humanPlayerSymbol = getHumanPlayerSymbol(cpuPlayerSymbol);
 
   const winnerInfo = useMemo(
     () => calculateWinner(currentEntry.squares, boardRules),
@@ -139,10 +154,11 @@ export default function Game() {
   );
   const winner = winnerInfo?.winner ?? null;
   const isDraw = !winnerInfo && isBoardFull(currentEntry.squares);
-  const isCpuTurn = isCpuMode && !xIsNext && !winnerInfo && !isDraw;
+  const isCpuTurn =
+    isCpuMode && currentPlayer === cpuPlayerSymbol && !winnerInfo && !isDraw;
   const defaultMatchDisplayNames = useMemo(
-    () => createDefaultMatchDisplayNames({ authUser, profileName }),
-    [authUser, profileName]
+    () => createDefaultMatchDisplayNames({ authUser, profileName, cpuPlayerSymbol }),
+    [authUser, cpuPlayerSymbol, profileName]
   );
   const resolvedMatchDisplayNames = useMemo(
     () => ({
@@ -194,6 +210,8 @@ export default function Game() {
   boardRulesRef.current = boardRules;
   gameModeRef.current = gameMode;
   cpuDifficultyRef.current = cpuDifficulty;
+  cpuPlayerSymbolRef.current = cpuPlayerSymbol;
+  humanPlayerSymbolRef.current = humanPlayerSymbol;
   startingPlayerRef.current = startingPlayer;
   authUserRef.current = authUser;
   recordsRef.current = recordsState.records;
@@ -327,6 +345,27 @@ export default function Game() {
       }
     },
     [invalidatePendingCpuTurn, isCpuMode, resetMatch]
+  );
+
+  const handleCpuPlayerSymbolChange = useCallback(
+    (nextCpuPlayerSymbol) => {
+      if (nextCpuPlayerSymbol === cpuPlayerSymbol) {
+        return;
+      }
+
+      invalidatePendingCpuTurn();
+      setCpuPlayerSymbol(nextCpuPlayerSymbol);
+      setMatchDisplayNames((previousNames) => ({
+        ...previousNames,
+        cpu: swapCpuMarkerValues(previousNames.cpu),
+      }));
+      setCustomizedNames((previousState) => ({
+        ...previousState,
+        cpu: swapCpuMarkerValues(previousState.cpu),
+      }));
+      resetMatch();
+    },
+    [cpuPlayerSymbol, invalidatePendingCpuTurn, resetMatch]
   );
 
   const handleToggleSort = useCallback(() => {
@@ -666,7 +705,7 @@ export default function Game() {
       );
       const latestIsCpuTurn =
         gameModeRef.current === "cpu" &&
-        latestCurrentPlayer === "O" &&
+        latestCurrentPlayer === cpuPlayerSymbolRef.current &&
         !latestWinnerInfo &&
         !latestIsDraw;
 
@@ -678,6 +717,8 @@ export default function Game() {
         squares: latestSquares,
         boardRules: latestBoardRules,
         difficulty: cpuDifficultyRef.current,
+        cpuPlayer: cpuPlayerSymbolRef.current,
+        humanPlayer: humanPlayerSymbolRef.current,
       });
 
       if (cpuMove === null || latestSquares[cpuMove]) {
@@ -685,14 +726,14 @@ export default function Game() {
       }
 
       const nextSquares = latestSquares.slice();
-      nextSquares[cpuMove] = "O";
+      nextSquares[cpuMove] = cpuPlayerSymbolRef.current;
 
       const nextHistory = [
         ...latestHistory.slice(0, latestCurrentMove + 1),
         {
           squares: nextSquares,
           moveLocation: getMoveLocation(cpuMove, latestBoardRules.boardSize),
-          player: "O",
+          player: cpuPlayerSymbolRef.current,
         },
       ];
 
@@ -749,6 +790,8 @@ export default function Game() {
         gameMode,
         boardSize,
         cpuDifficulty: gameMode === "cpu" ? cpuDifficulty : null,
+        humanPlayer: gameMode === "cpu" ? humanPlayerSymbol : null,
+        cpuPlayer: gameMode === "cpu" ? cpuPlayerSymbol : null,
         winner,
         isDraw,
         finalSquares: currentEntry.squares,
@@ -796,9 +839,11 @@ export default function Game() {
     authUser,
     boardSize,
     cpuDifficulty,
+    cpuPlayerSymbol,
     currentEntry.squares,
     currentMove,
     gameMode,
+    humanPlayerSymbol,
     history,
     history.length,
     isDraw,
@@ -846,8 +891,10 @@ export default function Game() {
             <GameModeSelector
               gameMode={gameMode}
               cpuDifficulty={cpuDifficulty}
+              cpuPlayerSymbol={cpuPlayerSymbol}
               onGameModeChange={handleGameModeChange}
               onCpuDifficultyChange={handleCpuDifficultyChange}
+              onCpuPlayerSymbolChange={handleCpuPlayerSymbolChange}
             />
 
             <BoardSizeSelector
@@ -857,6 +904,7 @@ export default function Game() {
 
             <MatchDisplayNamePanel
               gameMode={gameMode}
+              cpuPlayerSymbol={cpuPlayerSymbol}
               matchDisplayNames={matchDisplayNames}
               defaultMatchDisplayNames={defaultMatchDisplayNames}
               customizedNames={customizedNames}
@@ -892,6 +940,8 @@ export default function Game() {
               xIsNext={xIsNext}
               gameMode={gameMode}
               cpuDifficulty={cpuDifficulty}
+              humanPlayerSymbol={humanPlayerSymbol}
+              cpuPlayerSymbol={cpuPlayerSymbol}
               isCpuTurn={isCpuTurn}
               lastMovePlayer={currentEntry.player}
               lastMoveLocation={currentEntry.moveLocation}

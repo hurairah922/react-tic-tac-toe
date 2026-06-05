@@ -21,7 +21,7 @@ export async function fetchCloudMatchHistory(authUser) {
   const { data, error } = await client
     .from(MATCH_HISTORY_TABLE)
     .select(
-      "id, mode, board_size, difficulty, result, winner, player_x_name, player_o_name, move_count, moves, completed_at, created_at"
+      "id, mode, board_size, difficulty, human_symbol, result, winner, player_x_name, player_o_name, move_count, moves, completed_at, created_at"
     )
     .eq("user_id", userId)
     .order("completed_at", { ascending: true })
