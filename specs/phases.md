@@ -190,7 +190,7 @@ Acceptance criteria:
 
 ## Phase 8: Cloud Records
 
-Status: `Active`
+Status: `Done`
 
 Goal:
 
