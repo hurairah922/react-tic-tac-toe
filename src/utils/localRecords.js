@@ -237,7 +237,7 @@ export function hasRecordedGames(records) {
 
 export function updateRecordsForResult(
   records,
-  { gameMode, boardSize, winner, isDraw }
+  { gameMode, boardSize, winner, isDraw, humanPlayer = "X", cpuPlayer = "O" }
 ) {
   if (!isDraw && winner !== "X" && winner !== "O") {
     return normalizeLocalRecords(records);
@@ -258,7 +258,7 @@ export function updateRecordsForResult(
       return nextRecords;
     }
 
-    if (winner === "X") {
+    if (winner === humanPlayer) {
       bucket.wins += 1;
       bucket.currentWinStreak += 1;
       bucket.bestWinStreak = Math.max(
@@ -268,8 +268,11 @@ export function updateRecordsForResult(
       return nextRecords;
     }
 
-    bucket.losses += 1;
-    bucket.currentWinStreak = 0;
+    if (winner === cpuPlayer) {
+      bucket.losses += 1;
+      bucket.currentWinStreak = 0;
+    }
+
     return nextRecords;
   }
 

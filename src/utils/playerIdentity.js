@@ -41,15 +41,26 @@ export function getProfileDefaultName({ authUser, profileName }) {
   return getAuthFallbackName(authUser) || GUEST_PLAYER_NAME;
 }
 
-export function createDefaultMatchDisplayNames({ authUser, profileName }) {
+export function createDefaultMatchDisplayNames({
+  authUser,
+  profileName,
+  cpuPlayerSymbol = "O",
+}) {
   const signedInDefaultName = getProfileDefaultName({ authUser, profileName });
   const isSignedIn = Boolean(authUser);
+  const humanPlayerSymbol = cpuPlayerSymbol === "X" ? "O" : "X";
+  const cpuNames = {
+    X: CPU_PLAYER_NAME,
+    O: CPU_PLAYER_NAME,
+  };
+
+  cpuNames[humanPlayerSymbol] = isSignedIn
+    ? signedInDefaultName
+    : GUEST_PLAYER_NAME;
+  cpuNames[cpuPlayerSymbol] = CPU_PLAYER_NAME;
 
   return {
-    cpu: {
-      X: isSignedIn ? signedInDefaultName : GUEST_PLAYER_NAME,
-      O: CPU_PLAYER_NAME,
-    },
+    cpu: cpuNames,
     human: {
       X: isSignedIn ? signedInDefaultName : LOCAL_PLAYER_X_NAME,
       O: LOCAL_PLAYER_O_NAME,

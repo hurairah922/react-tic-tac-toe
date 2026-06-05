@@ -10,6 +10,8 @@ function StatusPanel({
   xIsNext,
   gameMode,
   cpuDifficulty,
+  humanPlayerSymbol,
+  cpuPlayerSymbol,
   isCpuTurn,
   lastMovePlayer,
   lastMoveLocation,
@@ -43,12 +45,12 @@ function StatusPanel({
     detail = `${playerDisplayNames[startingPlayer]} makes the first move in this round.`;
   } else if (isCpuMode) {
     status = isCpuTurn
-      ? `${playerDisplayNames.O} turn`
-      : `${playerDisplayNames.X} turn`;
+      ? `${playerDisplayNames[cpuPlayerSymbol]} turn`
+      : `${playerDisplayNames[humanPlayerSymbol]} turn`;
     detail = isCpuTurn
-      ? `${playerDisplayNames.O} is choosing a move. The board is locked until it finishes.`
+      ? `${playerDisplayNames[cpuPlayerSymbol]} is choosing a move. The board is locked until it finishes.`
       : lastMoveSummary ??
-        `${playerDisplayNames.X} is playing as X. Choose an empty square to continue.`;
+        `${playerDisplayNames[humanPlayerSymbol]} is playing as ${humanPlayerSymbol}. Choose an empty square to continue.`;
   } else if (lastMoveSummary) {
     detail = `${lastMoveSummary} ${detail}`;
   }

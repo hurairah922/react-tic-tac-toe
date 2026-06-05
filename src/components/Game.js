@@ -17,13 +17,10 @@ import {
   subscribeToAuthState,
 } from "../services/authService";
 import {
-  clearLocalRecords,
   createDefaultLocalRecords,
   getRecordBucket,
   hasRecordedGames,
   loadLocalRecords,
-  saveLocalRecords,
-  updateRecordsForResult,
 } from "../utils/localRecords";
 import {
   calculateWinner,
@@ -45,6 +42,12 @@ import {
   normalizeDisplayName,
 } from "../utils/playerIdentity";
 import { chooseCpuMove } from "../utils/cpuPlayer";
+import {
+  clearRecords,
+  loadRecords,
+  saveCompletedMatchResult,
+  shouldUseCloudRecords,
+} from "../services/records/recordsService";
 
 const CPU_MOVE_DELAY_MS = 450;
 
@@ -60,6 +63,17 @@ function createMatchNameCustomizationState() {
   return {
     cpu: { X: false, O: false },
     human: { X: false, O: false },
+  };
+}
+
+function getHumanPlayerSymbol(cpuPlayerSymbol) {
+  return cpuPlayerSymbol === "X" ? "O" : "X";
+}
+
+function swapCpuMarkerValues(markerValues) {
+  return {
+    X: markerValues.O,
+    O: markerValues.X,
   };
 }
 
@@ -91,12 +105,18 @@ export default function Game() {
   const [isLearnModalOpen, setIsLearnModalOpen] = useState(false);
   const [gameMode, setGameMode] = useState("cpu");
   const [cpuDifficulty, setCpuDifficulty] = useState("easy");
-  const [localRecords, setLocalRecords] = useState(() => loadLocalRecords());
+  const [cpuPlayerSymbol, setCpuPlayerSymbol] = useState("O");
   const [authUser, setAuthUser] = useState(initialAuthState.authUser);
   const [profileName, setProfileName] = useState(initialAuthState.profileName);
   const [authStatusMessage, setAuthStatusMessage] = useState("");
   const [authErrorMessage, setAuthErrorMessage] = useState("");
   const [isAuthBusy, setIsAuthBusy] = useState(false);
+  const [recordsState, setRecordsState] = useState(() => ({
+    source: "local",
+    records: loadLocalRecords(),
+    isLoading: false,
+    errorMessage: "",
+  }));
   const [customizedNames, setCustomizedNames] = useState(
     createMatchNameCustomizationState
   );
@@ -114,13 +134,19 @@ export default function Game() {
   const boardRulesRef = useRef(boardRules);
   const gameModeRef = useRef(gameMode);
   const cpuDifficultyRef = useRef(cpuDifficulty);
+  const cpuPlayerSymbolRef = useRef(cpuPlayerSymbol);
+  const humanPlayerSymbolRef = useRef(getHumanPlayerSymbol(cpuPlayerSymbol));
   const startingPlayerRef = useRef(startingPlayer);
+  const authUserRef = useRef(authUser);
+  const recordsRef = useRef(recordsState.records);
+  const recordsSourceRef = useRef(recordsState.source);
 
   const currentEntry = history[currentMove];
   const { boardSize, winLength } = boardRules;
   const currentPlayer = getPlayerForMove(startingPlayer, currentMove);
   const xIsNext = currentPlayer === "X";
   const isCpuMode = gameMode === "cpu";
+  const humanPlayerSymbol = getHumanPlayerSymbol(cpuPlayerSymbol);
 
   const winnerInfo = useMemo(
     () => calculateWinner(currentEntry.squares, boardRules),
@@ -128,10 +154,11 @@ export default function Game() {
   );
   const winner = winnerInfo?.winner ?? null;
   const isDraw = !winnerInfo && isBoardFull(currentEntry.squares);
-  const isCpuTurn = isCpuMode && !xIsNext && !winnerInfo && !isDraw;
+  const isCpuTurn =
+    isCpuMode && currentPlayer === cpuPlayerSymbol && !winnerInfo && !isDraw;
   const defaultMatchDisplayNames = useMemo(
-    () => createDefaultMatchDisplayNames({ authUser, profileName }),
-    [authUser, profileName]
+    () => createDefaultMatchDisplayNames({ authUser, profileName, cpuPlayerSymbol }),
+    [authUser, cpuPlayerSymbol, profileName]
   );
   const resolvedMatchDisplayNames = useMemo(
     () => ({
@@ -156,12 +183,12 @@ export default function Game() {
   );
   const playerDisplayNames = resolvedMatchDisplayNames[gameMode];
   const currentRecordBucket = useMemo(
-    () => getRecordBucket(localRecords, { gameMode, boardSize }),
-    [boardSize, gameMode, localRecords]
+    () => getRecordBucket(recordsState.records, { gameMode, boardSize }),
+    [boardSize, gameMode, recordsState.records]
   );
   const canClearLocalRecords = useMemo(
-    () => hasRecordedGames(localRecords),
-    [localRecords]
+    () => hasRecordedGames(recordsState.records),
+    [recordsState.records]
   );
   const boardTurnNotice = useMemo(() => {
     if (winner) {
@@ -183,7 +210,12 @@ export default function Game() {
   boardRulesRef.current = boardRules;
   gameModeRef.current = gameMode;
   cpuDifficultyRef.current = cpuDifficulty;
+  cpuPlayerSymbolRef.current = cpuPlayerSymbol;
+  humanPlayerSymbolRef.current = humanPlayerSymbol;
   startingPlayerRef.current = startingPlayer;
+  authUserRef.current = authUser;
+  recordsRef.current = recordsState.records;
+  recordsSourceRef.current = recordsState.source;
 
   const invalidatePendingCpuTurn = useCallback(() => {
     cpuTurnVersionRef.current += 1;
@@ -315,6 +347,27 @@ export default function Game() {
     [invalidatePendingCpuTurn, isCpuMode, resetMatch]
   );
 
+  const handleCpuPlayerSymbolChange = useCallback(
+    (nextCpuPlayerSymbol) => {
+      if (nextCpuPlayerSymbol === cpuPlayerSymbol) {
+        return;
+      }
+
+      invalidatePendingCpuTurn();
+      setCpuPlayerSymbol(nextCpuPlayerSymbol);
+      setMatchDisplayNames((previousNames) => ({
+        ...previousNames,
+        cpu: swapCpuMarkerValues(previousNames.cpu),
+      }));
+      setCustomizedNames((previousState) => ({
+        ...previousState,
+        cpu: swapCpuMarkerValues(previousState.cpu),
+      }));
+      resetMatch();
+    },
+    [cpuPlayerSymbol, invalidatePendingCpuTurn, resetMatch]
+  );
+
   const handleToggleSort = useCallback(() => {
     setIsAscending((previousValue) => !previousValue);
   }, []);
@@ -331,19 +384,43 @@ export default function Game() {
   }, []);
 
   const handleClearRecords = useCallback(() => {
+    const isCloudSource = recordsSourceRef.current === "cloud";
     const shouldClear =
       typeof window === "undefined" || typeof window.confirm !== "function"
         ? true
         : window.confirm(
-            "Clear all local Tic-Tac-Toe records stored in this browser?"
+            isCloudSource
+              ? "Clear all cloud Tic-Tac-Toe records saved to this account?"
+              : "Clear all local Tic-Tac-Toe records stored in this browser?"
           );
 
     if (!shouldClear) {
       return;
     }
 
-    clearLocalRecords();
-    setLocalRecords(createDefaultLocalRecords());
+    setRecordsState((previousState) => ({
+      ...previousState,
+      isLoading: isCloudSource,
+      errorMessage: "",
+    }));
+
+    clearRecords({ authUser: authUserRef.current })
+      .then((nextRecordsState) => {
+        setRecordsState({
+          ...nextRecordsState,
+          isLoading: false,
+          errorMessage: "",
+        });
+      })
+      .catch((error) => {
+        setRecordsState((previousState) => ({
+          ...previousState,
+          isLoading: false,
+          errorMessage:
+            error?.message ||
+            "Could not clear cloud records right now. Gameplay is still available.",
+        }));
+      });
   }, []);
 
   const applyAuthState = useCallback((nextAuthState) => {
@@ -555,6 +632,49 @@ export default function Game() {
   }, [applyAuthState]);
 
   useEffect(() => {
+    let isMounted = true;
+    const nextSource = shouldUseCloudRecords(authUser) ? "cloud" : "local";
+
+    setRecordsState((previousState) => ({
+      ...previousState,
+      source: nextSource,
+      isLoading: nextSource === "cloud",
+      errorMessage: "",
+    }));
+
+    loadRecords({ authUser })
+      .then((nextRecordsState) => {
+        if (!isMounted) {
+          return;
+        }
+
+        setRecordsState({
+          ...nextRecordsState,
+          isLoading: false,
+          errorMessage: "",
+        });
+      })
+      .catch((error) => {
+        if (!isMounted) {
+          return;
+        }
+
+        setRecordsState({
+          source: nextSource,
+          records: createDefaultLocalRecords(),
+          isLoading: false,
+          errorMessage:
+            error?.message ||
+            "Could not load cloud records right now. Gameplay is still available.",
+        });
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [authUser]);
+
+  useEffect(() => {
     if (!isCpuTurn) {
       invalidatePendingCpuTurn();
       return undefined;
@@ -585,7 +705,7 @@ export default function Game() {
       );
       const latestIsCpuTurn =
         gameModeRef.current === "cpu" &&
-        latestCurrentPlayer === "O" &&
+        latestCurrentPlayer === cpuPlayerSymbolRef.current &&
         !latestWinnerInfo &&
         !latestIsDraw;
 
@@ -597,6 +717,8 @@ export default function Game() {
         squares: latestSquares,
         boardRules: latestBoardRules,
         difficulty: cpuDifficultyRef.current,
+        cpuPlayer: cpuPlayerSymbolRef.current,
+        humanPlayer: humanPlayerSymbolRef.current,
       });
 
       if (cpuMove === null || latestSquares[cpuMove]) {
@@ -604,14 +726,14 @@ export default function Game() {
       }
 
       const nextSquares = latestSquares.slice();
-      nextSquares[cpuMove] = "O";
+      nextSquares[cpuMove] = cpuPlayerSymbolRef.current;
 
       const nextHistory = [
         ...latestHistory.slice(0, latestCurrentMove + 1),
         {
           squares: nextSquares,
           moveLocation: getMoveLocation(cpuMove, latestBoardRules.boardSize),
-          player: "O",
+          player: cpuPlayerSymbolRef.current,
         },
       ];
 
@@ -647,17 +769,88 @@ export default function Game() {
 
     recordedMatchIdRef.current = activeMatchIdRef.current;
     setNextStartingPlayer(getAlternatePlayer(startingPlayer));
-    setLocalRecords((previousRecords) =>
-      saveLocalRecords(
-        updateRecordsForResult(previousRecords, {
-          gameMode,
-          boardSize,
-          winner,
-          isDraw,
-        })
-      )
-    );
-  }, [boardSize, currentMove, gameMode, history.length, isDraw, startingPlayer, winner]);
+    const matchMoves = history.slice(1).map((entry, index) => ({
+      move: index + 1,
+      player: entry.player,
+      row: entry.moveLocation?.row,
+      col: entry.moveLocation?.col,
+      squareIndex:
+        entry.moveLocation?.row && entry.moveLocation?.col
+          ? (entry.moveLocation.row - 1) * boardSize + (entry.moveLocation.col - 1)
+          : null,
+    }));
+    const authUserAtSave = authUser;
+    const sourceAtSave = shouldUseCloudRecords(authUserAtSave) ? "cloud" : "local";
+    const saveKey = `${activeMatchIdRef.current}:${authUserAtSave?.id ?? "guest"}`;
+
+    saveCompletedMatchResult({
+      authUser: authUserAtSave,
+      currentRecords: recordsRef.current,
+      matchData: {
+        gameMode,
+        boardSize,
+        cpuDifficulty: gameMode === "cpu" ? cpuDifficulty : null,
+        humanPlayer: gameMode === "cpu" ? humanPlayerSymbol : null,
+        cpuPlayer: gameMode === "cpu" ? cpuPlayerSymbol : null,
+        winner,
+        isDraw,
+        finalSquares: currentEntry.squares,
+        playerDisplayNames,
+        moves: matchMoves,
+        completedAt: Date.now(),
+      },
+      saveKey,
+    }).then((saveResult) => {
+      if (!saveResult.didSave) {
+        if (
+          saveResult.errorMessage &&
+          sourceAtSave === "cloud" &&
+          recordsSourceRef.current === "cloud" &&
+          authUserRef.current?.id === authUserAtSave?.id
+        ) {
+          setRecordsState((previousState) => ({
+            ...previousState,
+            errorMessage: saveResult.errorMessage,
+          }));
+        }
+
+        return;
+      }
+
+      if (sourceAtSave === "cloud") {
+        if (
+          recordsSourceRef.current !== "cloud" ||
+          authUserRef.current?.id !== authUserAtSave?.id
+        ) {
+          return;
+        }
+      } else if (recordsSourceRef.current !== "local") {
+        return;
+      }
+
+      setRecordsState((previousState) => ({
+        ...previousState,
+        source: saveResult.source,
+        records: saveResult.records,
+        errorMessage: "",
+      }));
+    });
+  }, [
+    authUser,
+    boardSize,
+    cpuDifficulty,
+    cpuPlayerSymbol,
+    currentEntry.squares,
+    currentMove,
+    gameMode,
+    humanPlayerSymbol,
+    history,
+    history.length,
+    isDraw,
+    playerDisplayNames,
+    startingPlayer,
+    winner,
+  ]);
 
   const isMatchComplete = Boolean(winnerInfo) || isDraw;
 
@@ -698,8 +891,10 @@ export default function Game() {
             <GameModeSelector
               gameMode={gameMode}
               cpuDifficulty={cpuDifficulty}
+              cpuPlayerSymbol={cpuPlayerSymbol}
               onGameModeChange={handleGameModeChange}
               onCpuDifficultyChange={handleCpuDifficultyChange}
+              onCpuPlayerSymbolChange={handleCpuPlayerSymbolChange}
             />
 
             <BoardSizeSelector
@@ -709,6 +904,7 @@ export default function Game() {
 
             <MatchDisplayNamePanel
               gameMode={gameMode}
+              cpuPlayerSymbol={cpuPlayerSymbol}
               matchDisplayNames={matchDisplayNames}
               defaultMatchDisplayNames={defaultMatchDisplayNames}
               customizedNames={customizedNames}
@@ -744,6 +940,8 @@ export default function Game() {
               xIsNext={xIsNext}
               gameMode={gameMode}
               cpuDifficulty={cpuDifficulty}
+              humanPlayerSymbol={humanPlayerSymbol}
+              cpuPlayerSymbol={cpuPlayerSymbol}
               isCpuTurn={isCpuTurn}
               lastMovePlayer={currentEntry.player}
               lastMoveLocation={currentEntry.moveLocation}
@@ -820,8 +1018,11 @@ export default function Game() {
               gameMode={gameMode}
               boardSize={boardSize}
               records={currentRecordBucket}
+              source={recordsState.source}
+              isLoading={recordsState.isLoading}
+              errorMessage={recordsState.errorMessage}
               onClear={handleClearRecords}
-              isClearDisabled={!canClearLocalRecords}
+              isClearDisabled={!canClearLocalRecords || recordsState.isLoading}
             />
 
             <div className="learn-callout">

@@ -175,7 +175,7 @@ Acceptance criteria:
 
 ## Phase 7: Optional Accounts
 
-Status: `Active`
+Status: `Done`
 
 Goal:
 
@@ -190,7 +190,7 @@ Acceptance criteria:
 
 ## Phase 8: Cloud Records
 
-Status: `Not Started`
+Status: `Done`
 
 Goal:
 

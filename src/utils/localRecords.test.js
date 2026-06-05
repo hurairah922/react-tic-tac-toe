@@ -97,6 +97,36 @@ describe("localRecords", () => {
     });
   });
 
+  test("tracks cpu wins and losses using the chosen human symbol", () => {
+    let records = createDefaultLocalRecords();
+
+    records = updateRecordsForResult(records, {
+      gameMode: "cpu",
+      boardSize: 3,
+      winner: "O",
+      isDraw: false,
+      humanPlayer: "O",
+      cpuPlayer: "X",
+    });
+    records = updateRecordsForResult(records, {
+      gameMode: "cpu",
+      boardSize: 3,
+      winner: "X",
+      isDraw: false,
+      humanPlayer: "O",
+      cpuPlayer: "X",
+    });
+
+    expect(getRecordBucket(records, { gameMode: "cpu", boardSize: 3 })).toEqual({
+      wins: 1,
+      losses: 1,
+      draws: 0,
+      currentWinStreak: 0,
+      bestWinStreak: 1,
+      totalGames: 2,
+    });
+  });
+
   test("tracks human records without assigning losses to either player", () => {
     let records = createDefaultLocalRecords();
 
