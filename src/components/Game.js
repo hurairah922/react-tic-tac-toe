@@ -3,18 +3,37 @@ import AccountPanel from "./AccountPanel";
 import Board from "./Board";
 import BoardSizeSelector from "./BoardSizeSelector";
 import GameModeSelector from "./GameModeSelector";
+import InviteMatchPanel from "./InviteMatchPanel";
 import LearnModal from "./LearnModal";
 import LocalRecordsPanel from "./LocalRecordsPanel";
 import MoveHistory from "./MoveHistory";
 import StatusPanel from "./StatusPanel";
 import {
+  clearPostLoginRedirectPath,
   getInitialAuthState,
   loadAuthState,
+  loadPostLoginRedirectPath,
   saveProfileNameAsync,
+  savePostLoginRedirectPath,
   signOutAsync,
   signInWithEmail,
   subscribeToAuthState,
 } from "../services/authService";
+import {
+  buildInviteHistory,
+  getInviteRoomDisplayNames,
+  getInviteRoomEntryState,
+  getInviteRoomParticipantSymbol,
+} from "../services/inviteRooms/inviteRoomState";
+import {
+  canUseInviteMultiplayer,
+  createInviteRoom,
+  fetchInviteRoom,
+  joinInviteRoom,
+  playInviteMove,
+  restartInviteRoom,
+  subscribeToInviteRoom,
+} from "../services/inviteRooms/inviteRoomService";
 import {
   createDefaultLocalRecords,
   getRecordBucket,
@@ -38,6 +57,7 @@ import {
 import {
   createDefaultMatchDisplayNames,
   formatPlayerLabel,
+  getProfileDefaultName,
 } from "../utils/playerIdentity";
 import { chooseCpuMove } from "../utils/cpuPlayer";
 import {
@@ -46,6 +66,14 @@ import {
   saveCompletedMatchResult,
   shouldUseCloudRecords,
 } from "../services/records/recordsService";
+import {
+  getCurrentPath,
+  navigateToPath,
+  navigateHome,
+  navigateToInviteLobby,
+  navigateToInviteRoom,
+  parseInviteRoute,
+} from "../utils/inviteRoutes";
 
 const CPU_MOVE_DELAY_MS = 450;
 
@@ -57,12 +85,27 @@ function createInitialEntry(boardSize) {
   };
 }
 
+function createInitialInviteRoomState() {
+  return {
+    room: null,
+    isLoading: false,
+    isCreating: false,
+    isJoining: false,
+    isPlaying: false,
+    isRestarting: false,
+    errorMessage: "",
+    statusMessage: "",
+    copyStatus: "",
+  };
+}
+
 function getHumanPlayerSymbol(cpuPlayerSymbol) {
   return cpuPlayerSymbol === "X" ? "O" : "X";
 }
 
 export default function Game() {
   const initialAuthState = useMemo(() => getInitialAuthState(), []);
+  const [routeState, setRouteState] = useState(() => parseInviteRoute());
   const [boardRules, setBoardRules] = useState(DEFAULT_BOARD_RULES);
   const [history, setHistory] = useState(() => [
     createInitialEntry(DEFAULT_BOARD_RULES.boardSize),
@@ -74,7 +117,7 @@ export default function Game() {
   );
   const [isAscending, setIsAscending] = useState(true);
   const [isLearnModalOpen, setIsLearnModalOpen] = useState(false);
-  const [gameMode, setGameMode] = useState("cpu");
+  const [selectedGameMode, setSelectedGameMode] = useState("cpu");
   const [cpuDifficulty, setCpuDifficulty] = useState("easy");
   const [cpuPlayerSymbol, setCpuPlayerSymbol] = useState("O");
   const [authUser, setAuthUser] = useState(initialAuthState.authUser);
@@ -82,12 +125,22 @@ export default function Game() {
   const [authStatusMessage, setAuthStatusMessage] = useState("");
   const [authErrorMessage, setAuthErrorMessage] = useState("");
   const [isAuthBusy, setIsAuthBusy] = useState(false);
+  const [isAuthResolved, setIsAuthResolved] = useState(false);
   const [recordsState, setRecordsState] = useState(() => ({
     source: "local",
     records: loadLocalRecords(),
     isLoading: false,
     errorMessage: "",
   }));
+  const inviteDefaultName = useMemo(
+    () => getProfileDefaultName({ authUser, profileName }),
+    [authUser, profileName]
+  );
+  const [inviteDisplayName, setInviteDisplayName] = useState(inviteDefaultName);
+  const [isInviteDisplayNameDirty, setIsInviteDisplayNameDirty] = useState(false);
+  const [inviteRoomState, setInviteRoomState] = useState(
+    createInitialInviteRoomState
+  );
   const learnButtonRef = useRef(null);
   const cpuTimeoutRef = useRef(null);
   const cpuTurnVersionRef = useRef(0);
@@ -97,7 +150,7 @@ export default function Game() {
   const historyRef = useRef(history);
   const currentMoveRef = useRef(currentMove);
   const boardRulesRef = useRef(boardRules);
-  const gameModeRef = useRef(gameMode);
+  const gameModeRef = useRef(selectedGameMode);
   const cpuDifficultyRef = useRef(cpuDifficulty);
   const cpuPlayerSymbolRef = useRef(cpuPlayerSymbol);
   const humanPlayerSymbolRef = useRef(getHumanPlayerSymbol(cpuPlayerSymbol));
@@ -106,35 +159,222 @@ export default function Game() {
   const recordsRef = useRef(recordsState.records);
   const recordsSourceRef = useRef(recordsState.source);
 
-  const currentEntry = history[currentMove];
-  const { boardSize, winLength } = boardRules;
-  const currentPlayer = getPlayerForMove(startingPlayer, currentMove);
-  const xIsNext = currentPlayer === "X";
+  const gameMode = routeState.kind === "home" ? selectedGameMode : "invite";
+  const isInviteMode = gameMode === "invite";
   const isCpuMode = gameMode === "cpu";
   const humanPlayerSymbol = getHumanPlayerSymbol(cpuPlayerSymbol);
-
-  const winnerInfo = useMemo(
-    () => calculateWinner(currentEntry.squares, boardRules),
-    [boardRules, currentEntry.squares]
+  const inviteEnabled = canUseInviteMultiplayer(authUser);
+  const inviteRoom = inviteRoomState.room;
+  const inviteParticipantSymbol = useMemo(
+    () => getInviteRoomParticipantSymbol(inviteRoom, authUser?.id),
+    [authUser?.id, inviteRoom]
   );
-  const winner = winnerInfo?.winner ?? null;
-  const isDraw = !winnerInfo && isBoardFull(currentEntry.squares);
+  const inviteEntryState = useMemo(
+    () => (isInviteMode ? getInviteRoomEntryState(inviteRoom, authUser) : null),
+    [authUser, inviteRoom, isInviteMode]
+  );
+  const effectiveBoardRules =
+    isInviteMode && inviteRoom && !inviteRoom.isInvalid
+      ? {
+          boardSize: inviteRoom.boardSize,
+          winLength: inviteRoom.winLength,
+        }
+      : boardRules;
+  const { boardSize, winLength } = effectiveBoardRules;
+  const inviteHistory = useMemo(() => {
+    if (!isInviteMode || !inviteRoom || inviteRoom.isInvalid) {
+      return [createInitialEntry(boardSize)];
+    }
+
+    return buildInviteHistory(inviteRoom);
+  }, [boardSize, inviteRoom, isInviteMode]);
+  const activeHistory = isInviteMode ? inviteHistory : history;
+  const activeCurrentMove = isInviteMode
+    ? Math.max(0, activeHistory.length - 1)
+    : currentMove;
+  const currentEntry =
+    activeHistory[activeCurrentMove] ?? createInitialEntry(boardSize);
+  const currentPlayer = isInviteMode
+    ? inviteRoom?.currentPlayer ?? "X"
+    : getPlayerForMove(startingPlayer, currentMove);
+  const xIsNext = currentPlayer === "X";
+  const winnerInfo = useMemo(
+    () => calculateWinner(currentEntry.squares, effectiveBoardRules),
+    [currentEntry.squares, effectiveBoardRules]
+  );
+  const winner = isInviteMode
+    ? inviteRoom?.winner === "X" || inviteRoom?.winner === "O"
+      ? inviteRoom.winner
+      : null
+    : winnerInfo?.winner ?? null;
+  const isDraw = isInviteMode
+    ? inviteRoom?.winner === "draw"
+    : !winnerInfo && isBoardFull(currentEntry.squares);
   const isCpuTurn =
-    isCpuMode && currentPlayer === cpuPlayerSymbol && !winnerInfo && !isDraw;
-  const matchDisplayNames = useMemo(
-    () => createDefaultMatchDisplayNames({ authUser, profileName, cpuPlayerSymbol }),
+    !isInviteMode &&
+    isCpuMode &&
+    currentPlayer === cpuPlayerSymbol &&
+    !winnerInfo &&
+    !isDraw;
+  const defaultMatchDisplayNames = useMemo(
+    () =>
+      createDefaultMatchDisplayNames({ authUser, profileName, cpuPlayerSymbol }),
     [authUser, cpuPlayerSymbol, profileName]
   );
-  const playerDisplayNames = matchDisplayNames[gameMode];
+  const playerDisplayNames = isInviteMode
+    ? getInviteRoomDisplayNames(inviteRoom)
+    : defaultMatchDisplayNames[gameMode];
+  const recordGameMode = gameMode === "invite" ? "human" : gameMode;
   const currentRecordBucket = useMemo(
-    () => getRecordBucket(recordsState.records, { gameMode, boardSize }),
-    [boardSize, gameMode, recordsState.records]
+    () => getRecordBucket(recordsState.records, { gameMode: recordGameMode, boardSize }),
+    [boardSize, recordGameMode, recordsState.records]
   );
   const canClearLocalRecords = useMemo(
     () => hasRecordedGames(recordsState.records),
     [recordsState.records]
   );
+  const inviteStatusContent = useMemo(() => {
+    if (!isInviteMode) {
+      return null;
+    }
+
+    const statusChips = [
+      "Invite match",
+      `${boardSize}x${boardSize}`,
+      `${winLength} in a row`,
+    ];
+
+    if (inviteRoom?.id) {
+      statusChips.push(`Room: ${inviteRoom.status}`);
+    }
+
+    if (inviteParticipantSymbol) {
+      statusChips.push(`You are ${inviteParticipantSymbol}`);
+    }
+
+    if (inviteRoomState.isLoading) {
+      return {
+        status: "Loading invite match",
+        detail: "Checking the room link and current player list.",
+        chips: statusChips,
+      };
+    }
+
+    if (!isAuthResolved) {
+      return {
+        status: "Checking sign-in",
+        detail: "Confirming whether this browser already has access to the invite room.",
+        chips: statusChips,
+      };
+    }
+
+    if (inviteRoomState.isRestarting) {
+      return {
+        status: "Starting next round",
+        detail: "Resetting the board for both players.",
+        chips: statusChips,
+      };
+    }
+
+    if (!authUser || !inviteEnabled) {
+      return {
+        status: "Sign-in required",
+        detail:
+          "Invite multiplayer needs a signed-in Supabase account before a room can be created or joined.",
+        chips: statusChips,
+      };
+    }
+
+    if (!inviteRoom) {
+      return {
+        status: "Create an invite room",
+        detail:
+          "Choose a board, confirm the display name you want to share, and generate a private room link.",
+        chips: statusChips,
+      };
+    }
+
+    if (inviteEntryState?.state === "blocked" && inviteEntryState.message) {
+      return {
+        status: "Invite unavailable",
+        detail: inviteEntryState.message,
+        chips: statusChips,
+      };
+    }
+
+    if (winner) {
+      return {
+        status: `Winner: ${formatPlayerLabel(playerDisplayNames[winner], winner)}`,
+        detail: "The invite match is complete.",
+        chips: statusChips,
+      };
+    }
+
+    if (isDraw) {
+      return {
+        status: `Draw: ${playerDisplayNames.X} and ${playerDisplayNames.O}`,
+        detail: "The room is complete because the board is full.",
+        chips: statusChips,
+      };
+    }
+
+    if (!inviteRoom.players?.O) {
+      return {
+        status: "Waiting for opponent",
+        detail:
+          "Share the private link with another signed-in player so they can join the O side.",
+        chips: statusChips,
+      };
+    }
+
+    if (inviteEntryState?.state === "joinable") {
+      return {
+        status: "Ready to join",
+        detail:
+          "The room still has space. Review the setup, then join as the second player when you are ready.",
+        chips: statusChips,
+      };
+    }
+
+    if (
+      inviteParticipantSymbol &&
+      inviteRoom.currentPlayer === inviteParticipantSymbol
+    ) {
+      return {
+        status: `${playerDisplayNames[inviteParticipantSymbol]} turn`,
+        detail: "It is your turn. Choose an empty square to continue.",
+        chips: statusChips,
+      };
+    }
+
+    const waitingOnSymbol = inviteParticipantSymbol === "X" ? "O" : "X";
+
+    return {
+      status: `${playerDisplayNames[waitingOnSymbol]} turn`,
+      detail: "The board will update as soon as your opponent moves.",
+      chips: statusChips,
+    };
+  }, [
+    authUser,
+    boardSize,
+    inviteEnabled,
+    inviteEntryState,
+    inviteParticipantSymbol,
+    inviteRoom,
+    isAuthResolved,
+    inviteRoomState.isLoading,
+    inviteRoomState.isRestarting,
+    isDraw,
+    isInviteMode,
+    playerDisplayNames,
+    winner,
+    winLength,
+  ]);
   const boardTurnNotice = useMemo(() => {
+    if (isInviteMode) {
+      return inviteStatusContent?.detail || inviteStatusContent?.status || "";
+    }
+
     if (winner) {
       return `Winner: ${formatPlayerLabel(playerDisplayNames[winner], winner)}`;
     }
@@ -147,7 +387,63 @@ export default function Game() {
       playerDisplayNames[currentPlayer],
       currentPlayer
     )}`;
-  }, [currentPlayer, isDraw, playerDisplayNames, winner]);
+  }, [
+    currentPlayer,
+    inviteStatusContent,
+    isDraw,
+    isInviteMode,
+    playerDisplayNames,
+    winner,
+  ]);
+  const boardHeading = useMemo(() => {
+    if (!isInviteMode) {
+      return "";
+    }
+
+    if (inviteRoomState.isLoading) {
+      return "Loading invite match";
+    }
+
+    if (!inviteRoom) {
+      return "Invite lobby";
+    }
+
+    if (winner || isDraw) {
+      return "Invite match complete";
+    }
+
+    if (!inviteRoom.players?.O) {
+      return "Waiting for opponent";
+    }
+
+    if (
+      inviteParticipantSymbol &&
+      inviteRoom.currentPlayer === inviteParticipantSymbol
+    ) {
+      return "Your turn";
+    }
+
+    return "Invite match";
+  }, [
+    inviteParticipantSymbol,
+    inviteRoom,
+    inviteRoomState.isLoading,
+    isDraw,
+    isInviteMode,
+    winner,
+  ]);
+  const isInviteInteractionDisabled =
+    !isInviteMode ||
+    inviteRoomState.isLoading ||
+    inviteRoomState.isPlaying ||
+    inviteRoomState.isRestarting ||
+    inviteEntryState?.state !== "participant" ||
+    !inviteRoom ||
+    inviteRoom.status !== "active" ||
+    !inviteParticipantSymbol ||
+    inviteRoom.currentPlayer !== inviteParticipantSymbol ||
+    Boolean(inviteRoom.winner);
+
   historyRef.current = history;
   currentMoveRef.current = currentMove;
   boardRulesRef.current = boardRules;
@@ -159,6 +455,25 @@ export default function Game() {
   authUserRef.current = authUser;
   recordsRef.current = recordsState.records;
   recordsSourceRef.current = recordsState.source;
+
+  useEffect(() => {
+    if (!isInviteDisplayNameDirty) {
+      setInviteDisplayName(inviteDefaultName);
+    }
+  }, [inviteDefaultName, isInviteDisplayNameDirty]);
+
+  useEffect(() => {
+    if (!inviteRoom || !inviteParticipantSymbol) {
+      return;
+    }
+
+    const currentParticipantName =
+      inviteRoom.players?.[inviteParticipantSymbol]?.displayName;
+
+    if (currentParticipantName) {
+      setInviteDisplayName(currentParticipantName);
+    }
+  }, [inviteParticipantSymbol, inviteRoom]);
 
   const invalidatePendingCpuTurn = useCallback(() => {
     cpuTurnVersionRef.current += 1;
@@ -190,6 +505,47 @@ export default function Game() {
 
   const handlePlay = useCallback(
     (squareIndex) => {
+      if (isInviteMode) {
+        if (
+          !inviteRoom ||
+          inviteRoomState.isPlaying ||
+          inviteEntryState?.state !== "participant" ||
+          inviteRoom.status !== "active" ||
+          inviteRoom.currentPlayer !== inviteParticipantSymbol ||
+          currentEntry.squares[squareIndex] ||
+          inviteRoom.winner
+        ) {
+          return;
+        }
+
+        setInviteRoomState((previousState) => ({
+          ...previousState,
+          isPlaying: true,
+          errorMessage: "",
+          statusMessage: "",
+        }));
+
+        playInviteMove({ roomId: inviteRoom.id, squareIndex })
+          .then((nextRoom) => {
+            setInviteRoomState((previousState) => ({
+              ...previousState,
+              room: nextRoom,
+              isPlaying: false,
+              errorMessage: "",
+            }));
+          })
+          .catch((error) => {
+            setInviteRoomState((previousState) => ({
+              ...previousState,
+              isPlaying: false,
+              errorMessage:
+                error?.message || "Could not save that move right now.",
+            }));
+          });
+
+        return;
+      }
+
       if (
         isCpuTurn ||
         currentEntry.squares[squareIndex] ||
@@ -204,8 +560,6 @@ export default function Game() {
 
       nextSquares[squareIndex] = player;
 
-      // If the user time-traveled earlier, discard the "future" branch before
-      // recording the newly chosen move so history stays linear.
       const nextHistory = [
         ...history.slice(0, currentMove + 1),
         {
@@ -220,36 +574,57 @@ export default function Game() {
     },
     [
       boardSize,
-      currentPlayer,
       currentEntry.squares,
+      currentPlayer,
       currentMove,
       history,
+      inviteEntryState?.state,
+      inviteParticipantSymbol,
+      inviteRoom,
+      inviteRoomState.isPlaying,
       isCpuTurn,
       isDraw,
+      isInviteMode,
       winnerInfo,
     ]
   );
 
   const handleJumpTo = useCallback(
     (nextMove) => {
+      if (isInviteMode) {
+        return;
+      }
+
       invalidatePendingCpuTurn();
       matchWasTimeTraveledRef.current = true;
       setCurrentMove(nextMove);
     },
-    [invalidatePendingCpuTurn]
+    [invalidatePendingCpuTurn, isInviteMode]
   );
 
   const handleReset = useCallback(() => {
+    if (isInviteMode) {
+      navigateToInviteLobby();
+      return;
+    }
+
     invalidatePendingCpuTurn();
     resetMatch();
-  }, [invalidatePendingCpuTurn, resetMatch]);
+  }, [invalidatePendingCpuTurn, isInviteMode, resetMatch]);
 
   const handleNewGame = useCallback(() => {
+    if (isInviteMode) {
+      navigateToInviteLobby();
+      return;
+    }
+
     invalidatePendingCpuTurn();
     resetMatch({ nextStarter: nextStartingPlayer });
-  }, [invalidatePendingCpuTurn, nextStartingPlayer, resetMatch]);
+  }, [invalidatePendingCpuTurn, isInviteMode, nextStartingPlayer, resetMatch]);
 
-  const undoMoveTarget = getUndoMoveTarget(currentMove, gameMode);
+  const undoMoveTarget = isInviteMode
+    ? null
+    : getUndoMoveTarget(currentMove, gameMode);
   const canUndo = undoMoveTarget !== null;
 
   const handleUndo = useCallback(() => {
@@ -265,6 +640,10 @@ export default function Game() {
 
   const handleBoardSizeChange = useCallback(
     (nextBoardSize) => {
+      if (isInviteMode && routeState.kind === "invite-room") {
+        return;
+      }
+
       const nextBoardRules = createBoardRules(nextBoardSize);
 
       invalidatePendingCpuTurn();
@@ -275,21 +654,31 @@ export default function Game() {
         nextStarter: DEFAULT_STARTING_PLAYER,
       });
     },
-    [invalidatePendingCpuTurn, resetMatch]
+    [invalidatePendingCpuTurn, isInviteMode, resetMatch, routeState.kind]
   );
 
   const handleGameModeChange = useCallback(
     (nextGameMode) => {
-      if (nextGameMode === gameMode) {
+      if (nextGameMode === "invite") {
+        invalidatePendingCpuTurn();
+        navigateToInviteLobby();
+        return;
+      }
+
+      if (routeState.kind !== "home") {
+        navigateHome();
+      }
+
+      if (nextGameMode === selectedGameMode && routeState.kind === "home") {
         return;
       }
 
       invalidatePendingCpuTurn();
-      setGameMode(nextGameMode);
+      setSelectedGameMode(nextGameMode);
       setNextStartingPlayer(DEFAULT_STARTING_PLAYER);
       resetMatch({ nextStarter: DEFAULT_STARTING_PLAYER });
     },
-    [gameMode, invalidatePendingCpuTurn, resetMatch]
+    [invalidatePendingCpuTurn, resetMatch, routeState.kind, selectedGameMode]
   );
 
   const handleCpuDifficultyChange = useCallback(
@@ -408,7 +797,10 @@ export default function Game() {
       setAuthErrorMessage("");
 
       try {
-        const result = await signInWithEmail(email);
+        const redirectPath =
+          loadPostLoginRedirectPath() ||
+          (routeState.kind === "invite-room" ? getCurrentPath() : "");
+        const result = await signInWithEmail(email, undefined, redirectPath);
 
         if (result?.authUser !== undefined || result?.profileName !== undefined) {
           applyAuthState(result);
@@ -427,7 +819,7 @@ export default function Game() {
         setIsAuthBusy(false);
       }
     },
-    [applyAuthState]
+    [applyAuthState, routeState.kind]
   );
 
   const handleSignOut = useCallback(async () => {
@@ -449,6 +841,183 @@ export default function Game() {
     }
   }, [applyAuthState]);
 
+  const handleInviteDisplayNameChange = useCallback((nextValue) => {
+    setInviteDisplayName(nextValue);
+    setIsInviteDisplayNameDirty(true);
+  }, []);
+
+  const handleCreateInviteRoom = useCallback(async () => {
+    if (!inviteEnabled) {
+      setInviteRoomState((previousState) => ({
+        ...previousState,
+        errorMessage:
+          "Sign in with a Supabase-backed account before creating an invite room.",
+      }));
+      return;
+    }
+
+    setInviteRoomState((previousState) => ({
+      ...previousState,
+      isCreating: true,
+      errorMessage: "",
+      statusMessage: "",
+      copyStatus: "",
+    }));
+
+    try {
+      const nextRoom = await createInviteRoom({
+        authUser,
+        displayName: inviteDisplayName,
+        boardRules,
+      });
+
+      setInviteRoomState((previousState) => ({
+        ...previousState,
+        room: nextRoom,
+        isCreating: false,
+        errorMessage: "",
+        statusMessage: "Invite room created. Copy the link and share it.",
+      }));
+      navigateToInviteRoom(nextRoom.id);
+    } catch (error) {
+      setInviteRoomState((previousState) => ({
+        ...previousState,
+        isCreating: false,
+        errorMessage:
+          error?.message || "Could not create an invite room right now.",
+      }));
+    }
+  }, [authUser, boardRules, inviteDisplayName, inviteEnabled]);
+
+  const handleJoinInviteRoom = useCallback(async () => {
+    if (!routeState.roomId) {
+      return;
+    }
+
+    setInviteRoomState((previousState) => ({
+      ...previousState,
+      isJoining: true,
+      errorMessage: "",
+      statusMessage: "",
+    }));
+
+    try {
+      const nextRoom = await joinInviteRoom({
+        roomId: routeState.roomId,
+        authUser,
+        displayName: inviteDisplayName,
+      });
+
+      setInviteRoomState((previousState) => ({
+        ...previousState,
+        room: nextRoom,
+        isJoining: false,
+        errorMessage: "",
+        statusMessage: "Joined invite room. Your board is now live.",
+      }));
+    } catch (error) {
+      setInviteRoomState((previousState) => ({
+        ...previousState,
+        isJoining: false,
+        errorMessage:
+          error?.message || "Could not join that invite room right now.",
+      }));
+    }
+  }, [authUser, inviteDisplayName, routeState.roomId]);
+
+  const canStartInviteRematch = Boolean(
+    isInviteMode &&
+      inviteRoom &&
+      inviteRoom.players?.O &&
+      inviteEntryState?.state === "participant" &&
+      inviteRoom.winner
+  );
+
+  const handleStartInviteRematch = useCallback(async () => {
+    if (!inviteRoom?.id || !canStartInviteRematch) {
+      return;
+    }
+
+    setInviteRoomState((previousState) => ({
+      ...previousState,
+      isRestarting: true,
+      errorMessage: "",
+      statusMessage: "",
+    }));
+
+    try {
+      const nextRoom = await restartInviteRoom({ roomId: inviteRoom.id });
+
+      setInviteRoomState((previousState) => ({
+        ...previousState,
+        room: nextRoom,
+        isRestarting: false,
+        errorMessage: "",
+        statusMessage: "Next round started.",
+      }));
+    } catch (error) {
+      setInviteRoomState((previousState) => ({
+        ...previousState,
+        isRestarting: false,
+        errorMessage:
+          error?.message || "Could not start the next round right now.",
+      }));
+    }
+  }, [canStartInviteRematch, inviteRoom?.id]);
+
+  const handleCopyInviteLink = useCallback(async () => {
+    if (!inviteRoom?.id) {
+      return;
+    }
+
+    const inviteUrl =
+      typeof window !== "undefined"
+        ? `${window.location.origin}/play/invite/${inviteRoom.id}`
+        : "";
+
+    if (!inviteUrl) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(inviteUrl);
+      setInviteRoomState((previousState) => ({
+        ...previousState,
+        copyStatus: "Invite link copied.",
+        errorMessage: "",
+      }));
+    } catch {
+      setInviteRoomState((previousState) => ({
+        ...previousState,
+        copyStatus: "",
+        errorMessage:
+          "Could not copy the link automatically. Select the field and copy it manually.",
+      }));
+    }
+  }, [inviteRoom?.id]);
+
+  const handleBackHome = useCallback(() => {
+    navigateHome();
+  }, []);
+
+  const handleOpenInviteLobby = useCallback(() => {
+    setInviteRoomState(createInitialInviteRoomState());
+    navigateToInviteLobby();
+  }, []);
+
+  useEffect(() => {
+    const handleRouteChange = () => {
+      setRouteState(parseInviteRoute());
+    };
+
+    handleRouteChange();
+    window.addEventListener("popstate", handleRouteChange);
+
+    return () => {
+      window.removeEventListener("popstate", handleRouteChange);
+    };
+  }, []);
+
   useEffect(() => {
     let isMounted = true;
 
@@ -459,12 +1028,14 @@ export default function Game() {
         }
 
         applyAuthState(nextAuthState);
+        setIsAuthResolved(true);
       })
       .catch((error) => {
         if (!isMounted) {
           return;
         }
 
+        setIsAuthResolved(true);
         setAuthErrorMessage(
           error?.message ||
             "Could not load account details. Guest play is still available."
@@ -477,6 +1048,7 @@ export default function Game() {
       }
 
       applyAuthState(nextAuthState);
+      setIsAuthResolved(true);
       setAuthErrorMessage("");
 
       if (event === "SIGNED_IN") {
@@ -493,6 +1065,28 @@ export default function Game() {
       unsubscribe();
     };
   }, [applyAuthState]);
+
+  useEffect(() => {
+    if (!isAuthResolved) {
+      return;
+    }
+
+    if (!authUser) {
+      return;
+    }
+
+    const pendingRedirectPath = loadPostLoginRedirectPath();
+
+    if (!pendingRedirectPath) {
+      return;
+    }
+
+    clearPostLoginRedirectPath();
+
+    if (getCurrentPath() !== pendingRedirectPath) {
+      navigateToPath(pendingRedirectPath, { replace: true });
+    }
+  }, [authUser, isAuthResolved]);
 
   useEffect(() => {
     let isMounted = true;
@@ -536,6 +1130,177 @@ export default function Game() {
       isMounted = false;
     };
   }, [authUser]);
+
+  useEffect(() => {
+    if (!isAuthResolved) {
+      return;
+    }
+
+    if (routeState.kind !== "invite-room") {
+      return;
+    }
+
+    if (authUser && inviteEnabled) {
+      return;
+    }
+
+    savePostLoginRedirectPath(getCurrentPath());
+    setAuthStatusMessage(
+      "Sign in first, then we will bring you straight back to the invite match."
+    );
+    navigateHome({ replace: true });
+  }, [authUser, inviteEnabled, isAuthResolved, routeState.kind]);
+
+  useEffect(() => {
+    if (routeState.kind === "home") {
+      setInviteRoomState(createInitialInviteRoomState());
+      return;
+    }
+
+    if (routeState.kind === "invite-lobby") {
+      setInviteRoomState((previousState) => ({
+        ...createInitialInviteRoomState(),
+        statusMessage: previousState.statusMessage,
+      }));
+    }
+  }, [routeState.kind]);
+
+  useEffect(() => {
+    if (routeState.kind !== "invite-room") {
+      return undefined;
+    }
+
+    if (!isAuthResolved) {
+      return undefined;
+    }
+
+    if (!routeState.roomId) {
+      setInviteRoomState((previousState) => ({
+        ...previousState,
+        room: null,
+        isLoading: false,
+        isRestarting: false,
+        errorMessage:
+          "This invite link is missing a room ID. Start a new invite match instead.",
+      }));
+      return undefined;
+    }
+
+    if (!authUser || !inviteEnabled) {
+      setInviteRoomState((previousState) => ({
+        ...previousState,
+        room: null,
+        isLoading: false,
+        isRestarting: false,
+        errorMessage:
+          "Sign in with a Supabase-backed account before joining an invite match.",
+      }));
+      return undefined;
+    }
+
+    let isMounted = true;
+
+    setInviteRoomState((previousState) => ({
+      ...previousState,
+      isLoading: true,
+      errorMessage: "",
+    }));
+
+    fetchInviteRoom(routeState.roomId)
+      .then((room) => {
+        if (!isMounted) {
+          return;
+        }
+
+        if (!room) {
+          setInviteRoomState((previousState) => ({
+            ...previousState,
+            room: null,
+            isLoading: false,
+            isRestarting: false,
+            errorMessage:
+              "That invite room could not be found. Start a new invite match instead.",
+          }));
+          return;
+        }
+
+        setInviteRoomState((previousState) => ({
+          ...previousState,
+          room,
+          isLoading: false,
+          isRestarting: false,
+          errorMessage: room.isInvalid
+            ? "This invite room has invalid data and cannot be loaded safely."
+            : "",
+        }));
+      })
+      .catch((error) => {
+        if (!isMounted) {
+          return;
+        }
+
+        setInviteRoomState((previousState) => ({
+          ...previousState,
+          room: null,
+          isLoading: false,
+          isRestarting: false,
+          errorMessage:
+            error?.message || "Could not load that invite room right now.",
+        }));
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [authUser, inviteEnabled, isAuthResolved, routeState.kind, routeState.roomId]);
+
+  useEffect(() => {
+    if (
+      routeState.kind !== "invite-room" ||
+      !routeState.roomId ||
+      !isAuthResolved ||
+      !authUser ||
+      !inviteEnabled
+    ) {
+      return undefined;
+    }
+
+    let unsubscribe = () => {};
+
+    try {
+      unsubscribe = subscribeToInviteRoom(routeState.roomId, {
+        onRoomChange: (nextRoom) => {
+          setInviteRoomState((previousState) => ({
+            ...previousState,
+            room: nextRoom,
+            isLoading: false,
+            isJoining: false,
+            isPlaying: false,
+            isRestarting: false,
+            errorMessage: nextRoom.isInvalid
+              ? "This invite room has invalid data and cannot be loaded safely."
+              : "",
+          }));
+        },
+        onRoomDeleted: () => {
+          setInviteRoomState((previousState) => ({
+            ...previousState,
+            room: null,
+            isLoading: false,
+            isJoining: false,
+            isPlaying: false,
+            isRestarting: false,
+            errorMessage:
+              "This invite room is no longer available. Start a new match instead.",
+          }));
+        },
+      });
+    } catch {
+      return undefined;
+    }
+
+    return unsubscribe;
+  }, [authUser, inviteEnabled, isAuthResolved, routeState.kind, routeState.roomId]);
 
   useEffect(() => {
     if (!isCpuTurn) {
@@ -614,6 +1379,10 @@ export default function Game() {
   }, [invalidatePendingCpuTurn, isCpuTurn]);
 
   useEffect(() => {
+    if (gameMode === "invite") {
+      return;
+    }
+
     if (!winner && !isDraw) {
       return;
     }
@@ -646,6 +1415,8 @@ export default function Game() {
     const sourceAtSave = shouldUseCloudRecords(authUserAtSave) ? "cloud" : "local";
     const saveKey = `${activeMatchIdRef.current}:${authUserAtSave?.id ?? "guest"}`;
 
+    // Invite multiplayer uses a different cloud room model and is intentionally
+    // excluded from Phase 8 records until it has dedicated storage semantics.
     saveCompletedMatchResult({
       authUser: authUserAtSave,
       currentRecords: recordsRef.current,
@@ -706,16 +1477,17 @@ export default function Game() {
     currentEntry.squares,
     currentMove,
     gameMode,
-    humanPlayerSymbol,
     history,
-    history.length,
+    humanPlayerSymbol,
     isDraw,
     playerDisplayNames,
     startingPlayer,
     winner,
   ]);
 
-  const isMatchComplete = Boolean(winnerInfo) || isDraw;
+  const isMatchComplete = isInviteMode
+    ? Boolean(inviteRoom?.winner)
+    : Boolean(winnerInfo) || isDraw;
 
   return (
     <main className="app-shell">
@@ -733,7 +1505,7 @@ export default function Game() {
         <div className="game-layout">
           <section className="game-main">
             <StatusPanel
-              currentMove={currentMove}
+              currentMove={activeCurrentMove}
               isDraw={isDraw}
               winner={winner}
               boardSize={boardSize}
@@ -748,56 +1520,77 @@ export default function Game() {
               lastMovePlayer={currentEntry.player}
               lastMoveLocation={currentEntry.moveLocation}
               playerDisplayNames={playerDisplayNames}
+              statusOverride={inviteStatusContent?.status ?? ""}
+              detailOverride={inviteStatusContent?.detail ?? ""}
+              statusChipsOverride={inviteStatusContent?.chips ?? null}
             />
 
             <Board
               actions={
-                <div className="board-toolbar" aria-label="Round actions">
-                  {isMatchComplete ? (
+                isInviteMode ? (
+                  canStartInviteRematch ? (
+                    <div className="board-toolbar" aria-label="Invite actions">
+                      <button
+                        type="button"
+                        className="new-game-button"
+                        onClick={handleStartInviteRematch}
+                        disabled={inviteRoomState.isRestarting}
+                      >
+                        Start next round
+                      </button>
+                    </div>
+                  ) : null
+                ) : (
+                  <div className="board-toolbar" aria-label="Round actions">
+                    {isMatchComplete ? (
+                      <button
+                        type="button"
+                        className="new-game-button"
+                        onClick={handleNewGame}
+                      >
+                        New Game
+                      </button>
+                    ) : null}
+
                     <button
                       type="button"
-                      className="new-game-button"
-                      onClick={handleNewGame}
+                      className="history-sort-button"
+                      onClick={handleUndo}
+                      disabled={!canUndo}
                     >
-                      New Game
+                      Undo
                     </button>
-                  ) : null}
 
-                  <button
-                    type="button"
-                    className="history-sort-button"
-                    onClick={handleUndo}
-                    disabled={!canUndo}
-                  >
-                    Undo
-                  </button>
-
-                  <button
-                    type="button"
-                    className="reset-button"
-                    onClick={handleReset}
-                    disabled={history.length === 1}
-                  >
-                    Reset Game
-                  </button>
-                </div>
+                    <button
+                      type="button"
+                      className="reset-button"
+                      onClick={handleReset}
+                      disabled={history.length === 1}
+                    >
+                      Reset Game
+                    </button>
+                  </div>
+                )
               }
               squares={currentEntry.squares}
               boardSize={boardSize}
               onPlay={handlePlay}
               winningLine={winnerInfo?.line ?? []}
               isGameOver={isMatchComplete}
-              isInteractionDisabled={isCpuTurn}
+              isInteractionDisabled={
+                isInviteMode ? isInviteInteractionDisabled : isCpuTurn
+              }
               isCpuTurn={isCpuTurn}
               turnNotice={boardTurnNotice}
+              headingOverride={boardHeading}
             />
 
-            {history.length > 1 ? (
+            {activeHistory.length > 1 ? (
               <section className="sidebar-card history-card history-main-card">
                 <div className="sidebar-header">
                   <div>
                     <p className="eyebrow">History</p>
-                    <h2>Time travel</h2>
+                    <h2>{isInviteMode ? "Move log" : "Time travel"}</h2>
                   </div>
 
                   <button
@@ -814,11 +1607,12 @@ export default function Game() {
                 </div>
 
                 <MoveHistory
-                  history={history}
-                  currentMove={currentMove}
+                  history={activeHistory}
+                  currentMove={activeCurrentMove}
                   isAscending={isAscending}
                   onJumpTo={handleJumpTo}
                   playerDisplayNames={playerDisplayNames}
+                  isJumpDisabled={isInviteMode}
                 />
               </section>
             ) : null}
@@ -853,22 +1647,55 @@ export default function Game() {
                 />
 
                 <BoardSizeSelector
-                  boardRules={boardRules}
+                  boardRules={effectiveBoardRules}
                   onBoardSizeChange={handleBoardSizeChange}
+                  disabled={isInviteMode && routeState.kind === "invite-room"}
                 />
               </div>
             </section>
 
-            <LocalRecordsPanel
-              gameMode={gameMode}
-              boardSize={boardSize}
-              records={currentRecordBucket}
-              source={recordsState.source}
-              isLoading={recordsState.isLoading}
-              errorMessage={recordsState.errorMessage}
-              onClear={handleClearRecords}
-              isClearDisabled={!canClearLocalRecords || recordsState.isLoading}
-            />
+            {isInviteMode ? (
+              <InviteMatchPanel
+                authUser={authUser}
+                canUseInviteMultiplayer={inviteEnabled}
+                inviteDisplayName={inviteDisplayName}
+                onInviteDisplayNameChange={handleInviteDisplayNameChange}
+                onCreateRoom={handleCreateInviteRoom}
+                onJoinRoom={handleJoinInviteRoom}
+                onStartNextRound={handleStartInviteRematch}
+                onCopyLink={handleCopyInviteLink}
+                onBackHome={handleBackHome}
+                onOpenInviteLobby={handleOpenInviteLobby}
+                inviteRoom={inviteRoom}
+                inviteEntryState={inviteEntryState}
+                isLoading={inviteRoomState.isLoading}
+                isCreating={inviteRoomState.isCreating}
+                isJoining={inviteRoomState.isJoining}
+                isPlaying={inviteRoomState.isPlaying}
+                isRestarting={inviteRoomState.isRestarting}
+                errorMessage={
+                  inviteRoomState.errorMessage ||
+                  (inviteEntryState?.state === "blocked"
+                    ? inviteEntryState.message
+                    : "")
+                }
+                statusMessage={inviteRoomState.statusMessage}
+                copyStatus={inviteRoomState.copyStatus}
+                participantSymbol={inviteParticipantSymbol}
+                canStartNextRound={canStartInviteRematch}
+              />
+            ) : (
+              <LocalRecordsPanel
+                gameMode={recordGameMode}
+                boardSize={boardSize}
+                records={currentRecordBucket}
+                source={recordsState.source}
+                isLoading={recordsState.isLoading}
+                errorMessage={recordsState.errorMessage}
+                onClear={handleClearRecords}
+                isClearDisabled={!canClearLocalRecords || recordsState.isLoading}
+              />
+            )}
 
             <div className="learn-callout">
               <div>
@@ -894,7 +1721,7 @@ export default function Game() {
         </div>
 
         {isLearnModalOpen ? (
-          <LearnModal boardRules={boardRules} onClose={handleCloseLearnModal} />
+          <LearnModal boardRules={effectiveBoardRules} onClose={handleCloseLearnModal} />
         ) : null}
       </section>
     </main>

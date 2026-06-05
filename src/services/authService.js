@@ -7,6 +7,7 @@ import { supabase } from "./supabaseClient";
 
 export const AUTH_SESSION_STORAGE_KEY = "tic-tac-toe-auth-session";
 export const PROFILE_STORAGE_KEY = "tic-tac-toe-profile-map";
+export const POST_LOGIN_REDIRECT_STORAGE_KEY = "tic-tac-toe-post-login-redirect";
 const LOCAL_PROVIDER = "local";
 const SUPABASE_PROVIDER = "supabase";
 
@@ -23,6 +24,22 @@ function getStorage(storage) {
     return window.localStorage;
   } catch {
     return null;
+  }
+}
+
+function getRedirectStorage(storage) {
+  if (storage) {
+    return storage;
+  }
+
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    return window.sessionStorage;
+  } catch {
+    return getStorage();
   }
 }
 
@@ -47,6 +64,16 @@ function normalizeProfileName(name) {
     .trim()
     .replace(/\s+/g, " ")
     .slice(0, 24);
+}
+
+function normalizeRedirectPath(path) {
+  const normalizedPath = String(path ?? "").trim();
+
+  if (!normalizedPath.startsWith("/")) {
+    return "";
+  }
+
+  return normalizedPath;
 }
 
 function normalizeAuthUser(authUser, fallbackProvider = LOCAL_PROVIDER) {
@@ -110,16 +137,33 @@ function createSupabaseAuthState(session) {
   return createAuthState(authUser, getSupabaseProfileName(session?.user));
 }
 
-function getAuthRedirectUrl() {
-  if (SUPABASE_AUTH_REDIRECT_URL) {
-    return SUPABASE_AUTH_REDIRECT_URL;
+function getAuthRedirectUrl(redirectPath = "") {
+  const normalizedRedirectPath = normalizeRedirectPath(redirectPath);
+  const browserOrigin =
+    typeof window !== "undefined" && window.location?.origin
+      ? window.location.origin
+      : "";
+  const configuredBase = SUPABASE_AUTH_REDIRECT_URL || browserOrigin;
+
+  if (!configuredBase) {
+    return undefined;
   }
 
-  if (typeof window !== "undefined" && window.location?.origin) {
-    return window.location.origin;
-  }
+  try {
+    const configuredUrl = new URL(configuredBase, browserOrigin || undefined);
 
-  return undefined;
+    if (normalizedRedirectPath) {
+      return new URL(normalizedRedirectPath, configuredUrl.origin).toString();
+    }
+
+    return configuredUrl.toString();
+  } catch {
+    if (normalizedRedirectPath && browserOrigin) {
+      return `${browserOrigin}${normalizedRedirectPath}`;
+    }
+
+    return configuredBase;
+  }
 }
 
 export function isUsingSupabaseAuth() {
@@ -227,6 +271,53 @@ export function clearAuthSession(storage) {
   }
 }
 
+export function loadPostLoginRedirectPath(storage) {
+  const safeStorage = getRedirectStorage(storage);
+
+  if (!safeStorage) {
+    return "";
+  }
+
+  try {
+    return normalizeRedirectPath(
+      safeStorage.getItem(POST_LOGIN_REDIRECT_STORAGE_KEY) ?? ""
+    );
+  } catch {
+    return "";
+  }
+}
+
+export function savePostLoginRedirectPath(path, storage) {
+  const safeStorage = getRedirectStorage(storage);
+  const normalizedPath = normalizeRedirectPath(path);
+
+  if (!safeStorage || !normalizedPath) {
+    return normalizedPath;
+  }
+
+  try {
+    safeStorage.setItem(POST_LOGIN_REDIRECT_STORAGE_KEY, normalizedPath);
+  } catch {
+    return normalizedPath;
+  }
+
+  return normalizedPath;
+}
+
+export function clearPostLoginRedirectPath(storage) {
+  const safeStorage = getRedirectStorage(storage);
+
+  if (!safeStorage) {
+    return;
+  }
+
+  try {
+    safeStorage.removeItem(POST_LOGIN_REDIRECT_STORAGE_KEY);
+  } catch {
+    // Ignore unavailable storage so auth flows stay resilient.
+  }
+}
+
 export function getInitialAuthState(storage) {
   if (isUsingSupabaseAuth()) {
     return createAuthState(null, "");
@@ -267,7 +358,7 @@ export function subscribeToAuthState(onAuthStateChange) {
   };
 }
 
-export async function signInWithEmail(email, storage) {
+export async function signInWithEmail(email, storage, redirectPath = "") {
   const normalizedEmail = normalizeEmail(email);
 
   if (!normalizedEmail) {
@@ -278,7 +369,7 @@ export async function signInWithEmail(email, storage) {
     const { error } = await supabase.auth.signInWithOtp({
       email: normalizedEmail,
       options: {
-        emailRedirectTo: getAuthRedirectUrl(),
+        emailRedirectTo: getAuthRedirectUrl(redirectPath),
       },
     });
 

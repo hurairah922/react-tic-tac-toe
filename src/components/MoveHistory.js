@@ -6,6 +6,7 @@ function MoveHistory({
   isAscending,
   onJumpTo,
   playerDisplayNames,
+  isJumpDisabled = false,
 }) {
   const orderedMoves = useMemo(() => {
     const indexes = history.map((_, move) => move);
@@ -24,11 +25,12 @@ function MoveHistory({
   return (
     <div className="history-dropdown-panel" aria-label="Move history">
       <label className="control-field" htmlFor="move-history-select">
-        <span>Jump to move</span>
+        <span>{isJumpDisabled ? "Move log" : "Jump to move"}</span>
         <select
           id="move-history-select"
           className="control-select"
           value={currentMove}
+          disabled={isJumpDisabled}
           onChange={(event) => onJumpTo(Number(event.target.value))}
         >
           {orderedMoves.map((move) => {

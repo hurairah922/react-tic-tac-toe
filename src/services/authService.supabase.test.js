@@ -32,10 +32,48 @@ describe("authService in Supabase mode", () => {
     expect(signInWithOtp).toHaveBeenCalledWith({
       email: "player@example.com",
       options: {
-        emailRedirectTo: "http://localhost:3000",
+        emailRedirectTo: "http://localhost:3000/",
       },
     });
     expect(result.message).toMatch(/Magic link sent/);
+  });
+
+  test("uses the pending invite path as the Supabase redirect target", async () => {
+    const signInWithOtp = jest.fn().mockResolvedValue({ error: null });
+
+    jest.doMock("../config/env", () => ({
+      AUTH_PROVIDER: "supabase",
+      SUPABASE_AUTH_REDIRECT_URL: "https://game.example.com",
+      isSupabaseConfigured: () => true,
+    }));
+
+    jest.doMock("./supabaseClient", () => ({
+      supabase: {
+        auth: {
+          signInWithOtp,
+          getSession: jest.fn(),
+          onAuthStateChange: jest.fn(() => ({
+            data: { subscription: { unsubscribe: jest.fn() } },
+          })),
+          updateUser: jest.fn(),
+          signOut: jest.fn(),
+        },
+      },
+    }));
+
+    const { signInWithEmail } = await import("./authService");
+    await signInWithEmail(
+      "player@example.com",
+      undefined,
+      "/play/invite/room-42"
+    );
+
+    expect(signInWithOtp).toHaveBeenCalledWith({
+      email: "player@example.com",
+      options: {
+        emailRedirectTo: "https://game.example.com/play/invite/room-42",
+      },
+    });
   });
 
   test("saves profile names through Supabase user metadata", async () => {

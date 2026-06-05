@@ -12,6 +12,7 @@ function Board({
   isInteractionDisabled,
   isCpuTurn,
   turnNotice,
+  headingOverride = "",
 }) {
   const boardStyle = {
     gridTemplateRows: `repeat(${boardSize}, minmax(0, 1fr))`,
@@ -53,7 +54,9 @@ function Board({
       <div className="board-card-header">
         <div className="board-copy">
           <p className="eyebrow">Board</p>
-          {isGameOver ? (
+          {headingOverride ? (
+            <h2 id="board-heading">{headingOverride}</h2>
+          ) : isGameOver ? (
             <h2 id="board-heading">Game Over</h2>
           ) : isCpuTurn ? (
             <h2 id="board-heading">CPU is thinking</h2>

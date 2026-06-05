@@ -223,7 +223,7 @@ Acceptance criteria:
 
 ## Phase 9: Invite-Link Multiplayer
 
-Status: `Not Started`
+Status: `Active`
 
 Goal:
 
