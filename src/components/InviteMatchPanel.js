@@ -8,6 +8,7 @@ function InviteMatchPanel({
   onInviteDisplayNameChange,
   onCreateRoom,
   onJoinRoom,
+  onStartNextRound,
   onCopyLink,
   onBackHome,
   onOpenInviteLobby,
@@ -17,13 +18,16 @@ function InviteMatchPanel({
   isCreating,
   isJoining,
   isPlaying,
+  isRestarting,
   errorMessage,
   statusMessage,
   copyStatus,
   participantSymbol,
+  canStartNextRound,
 }) {
   const shareUrl = inviteRoom?.id ? buildInviteRoomUrl(inviteRoom.id) : "";
-  const isBusy = isLoading || isCreating || isJoining || isPlaying;
+  const isBusy =
+    isLoading || isCreating || isJoining || isPlaying || isRestarting;
   const hasSecondPlayer = Boolean(inviteRoom?.players?.O);
 
   return (
@@ -114,6 +118,17 @@ function InviteMatchPanel({
               disabled={isBusy || !inviteDisplayName.trim()}
             >
               Join as Player O
+            </button>
+          ) : null}
+
+          {canStartNextRound ? (
+            <button
+              type="button"
+              className="new-game-button"
+              onClick={onStartNextRound}
+              disabled={isBusy}
+            >
+              Start next round
             </button>
           ) : null}
 

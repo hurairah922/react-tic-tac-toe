@@ -9,9 +9,12 @@ import LocalRecordsPanel from "./LocalRecordsPanel";
 import MoveHistory from "./MoveHistory";
 import StatusPanel from "./StatusPanel";
 import {
+  clearPostLoginRedirectPath,
   getInitialAuthState,
   loadAuthState,
+  loadPostLoginRedirectPath,
   saveProfileNameAsync,
+  savePostLoginRedirectPath,
   signOutAsync,
   signInWithEmail,
   subscribeToAuthState,
@@ -28,6 +31,7 @@ import {
   fetchInviteRoom,
   joinInviteRoom,
   playInviteMove,
+  restartInviteRoom,
   subscribeToInviteRoom,
 } from "../services/inviteRooms/inviteRoomService";
 import {
@@ -63,6 +67,8 @@ import {
   shouldUseCloudRecords,
 } from "../services/records/recordsService";
 import {
+  getCurrentPath,
+  navigateToPath,
   navigateHome,
   navigateToInviteLobby,
   navigateToInviteRoom,
@@ -86,6 +92,7 @@ function createInitialInviteRoomState() {
     isCreating: false,
     isJoining: false,
     isPlaying: false,
+    isRestarting: false,
     errorMessage: "",
     statusMessage: "",
     copyStatus: "",
@@ -118,6 +125,7 @@ export default function Game() {
   const [authStatusMessage, setAuthStatusMessage] = useState("");
   const [authErrorMessage, setAuthErrorMessage] = useState("");
   const [isAuthBusy, setIsAuthBusy] = useState(false);
+  const [isAuthResolved, setIsAuthResolved] = useState(false);
   const [recordsState, setRecordsState] = useState(() => ({
     source: "local",
     records: loadLocalRecords(),
@@ -252,6 +260,22 @@ export default function Game() {
       };
     }
 
+    if (!isAuthResolved) {
+      return {
+        status: "Checking sign-in",
+        detail: "Confirming whether this browser already has access to the invite room.",
+        chips: statusChips,
+      };
+    }
+
+    if (inviteRoomState.isRestarting) {
+      return {
+        status: "Starting next round",
+        detail: "Resetting the board for both players.",
+        chips: statusChips,
+      };
+    }
+
     if (!authUser || !inviteEnabled) {
       return {
         status: "Sign-in required",
@@ -337,7 +361,9 @@ export default function Game() {
     inviteEntryState,
     inviteParticipantSymbol,
     inviteRoom,
+    isAuthResolved,
     inviteRoomState.isLoading,
+    inviteRoomState.isRestarting,
     isDraw,
     isInviteMode,
     playerDisplayNames,
@@ -410,6 +436,7 @@ export default function Game() {
     !isInviteMode ||
     inviteRoomState.isLoading ||
     inviteRoomState.isPlaying ||
+    inviteRoomState.isRestarting ||
     inviteEntryState?.state !== "participant" ||
     !inviteRoom ||
     inviteRoom.status !== "active" ||
@@ -770,7 +797,10 @@ export default function Game() {
       setAuthErrorMessage("");
 
       try {
-        const result = await signInWithEmail(email);
+        const redirectPath =
+          loadPostLoginRedirectPath() ||
+          (routeState.kind === "invite-room" ? getCurrentPath() : "");
+        const result = await signInWithEmail(email, undefined, redirectPath);
 
         if (result?.authUser !== undefined || result?.profileName !== undefined) {
           applyAuthState(result);
@@ -789,7 +819,7 @@ export default function Game() {
         setIsAuthBusy(false);
       }
     },
-    [applyAuthState]
+    [applyAuthState, routeState.kind]
   );
 
   const handleSignOut = useCallback(async () => {
@@ -895,6 +925,46 @@ export default function Game() {
     }
   }, [authUser, inviteDisplayName, routeState.roomId]);
 
+  const canStartInviteRematch = Boolean(
+    isInviteMode &&
+      inviteRoom &&
+      inviteRoom.players?.O &&
+      inviteEntryState?.state === "participant" &&
+      inviteRoom.winner
+  );
+
+  const handleStartInviteRematch = useCallback(async () => {
+    if (!inviteRoom?.id || !canStartInviteRematch) {
+      return;
+    }
+
+    setInviteRoomState((previousState) => ({
+      ...previousState,
+      isRestarting: true,
+      errorMessage: "",
+      statusMessage: "",
+    }));
+
+    try {
+      const nextRoom = await restartInviteRoom({ roomId: inviteRoom.id });
+
+      setInviteRoomState((previousState) => ({
+        ...previousState,
+        room: nextRoom,
+        isRestarting: false,
+        errorMessage: "",
+        statusMessage: "Next round started.",
+      }));
+    } catch (error) {
+      setInviteRoomState((previousState) => ({
+        ...previousState,
+        isRestarting: false,
+        errorMessage:
+          error?.message || "Could not start the next round right now.",
+      }));
+    }
+  }, [canStartInviteRematch, inviteRoom?.id]);
+
   const handleCopyInviteLink = useCallback(async () => {
     if (!inviteRoom?.id) {
       return;
@@ -958,12 +1028,14 @@ export default function Game() {
         }
 
         applyAuthState(nextAuthState);
+        setIsAuthResolved(true);
       })
       .catch((error) => {
         if (!isMounted) {
           return;
         }
 
+        setIsAuthResolved(true);
         setAuthErrorMessage(
           error?.message ||
             "Could not load account details. Guest play is still available."
@@ -976,6 +1048,7 @@ export default function Game() {
       }
 
       applyAuthState(nextAuthState);
+      setIsAuthResolved(true);
       setAuthErrorMessage("");
 
       if (event === "SIGNED_IN") {
@@ -992,6 +1065,28 @@ export default function Game() {
       unsubscribe();
     };
   }, [applyAuthState]);
+
+  useEffect(() => {
+    if (!isAuthResolved) {
+      return;
+    }
+
+    if (!authUser) {
+      return;
+    }
+
+    const pendingRedirectPath = loadPostLoginRedirectPath();
+
+    if (!pendingRedirectPath) {
+      return;
+    }
+
+    clearPostLoginRedirectPath();
+
+    if (getCurrentPath() !== pendingRedirectPath) {
+      navigateToPath(pendingRedirectPath, { replace: true });
+    }
+  }, [authUser, isAuthResolved]);
 
   useEffect(() => {
     let isMounted = true;
@@ -1037,6 +1132,26 @@ export default function Game() {
   }, [authUser]);
 
   useEffect(() => {
+    if (!isAuthResolved) {
+      return;
+    }
+
+    if (routeState.kind !== "invite-room") {
+      return;
+    }
+
+    if (authUser && inviteEnabled) {
+      return;
+    }
+
+    savePostLoginRedirectPath(getCurrentPath());
+    setAuthStatusMessage(
+      "Sign in first, then we will bring you straight back to the invite match."
+    );
+    navigateHome({ replace: true });
+  }, [authUser, inviteEnabled, isAuthResolved, routeState.kind]);
+
+  useEffect(() => {
     if (routeState.kind === "home") {
       setInviteRoomState(createInitialInviteRoomState());
       return;
@@ -1055,11 +1170,16 @@ export default function Game() {
       return undefined;
     }
 
+    if (!isAuthResolved) {
+      return undefined;
+    }
+
     if (!routeState.roomId) {
       setInviteRoomState((previousState) => ({
         ...previousState,
         room: null,
         isLoading: false,
+        isRestarting: false,
         errorMessage:
           "This invite link is missing a room ID. Start a new invite match instead.",
       }));
@@ -1071,6 +1191,7 @@ export default function Game() {
         ...previousState,
         room: null,
         isLoading: false,
+        isRestarting: false,
         errorMessage:
           "Sign in with a Supabase-backed account before joining an invite match.",
       }));
@@ -1096,6 +1217,7 @@ export default function Game() {
             ...previousState,
             room: null,
             isLoading: false,
+            isRestarting: false,
             errorMessage:
               "That invite room could not be found. Start a new invite match instead.",
           }));
@@ -1106,6 +1228,7 @@ export default function Game() {
           ...previousState,
           room,
           isLoading: false,
+          isRestarting: false,
           errorMessage: room.isInvalid
             ? "This invite room has invalid data and cannot be loaded safely."
             : "",
@@ -1120,6 +1243,7 @@ export default function Game() {
           ...previousState,
           room: null,
           isLoading: false,
+          isRestarting: false,
           errorMessage:
             error?.message || "Could not load that invite room right now.",
         }));
@@ -1128,12 +1252,13 @@ export default function Game() {
     return () => {
       isMounted = false;
     };
-  }, [authUser, inviteEnabled, routeState.kind, routeState.roomId]);
+  }, [authUser, inviteEnabled, isAuthResolved, routeState.kind, routeState.roomId]);
 
   useEffect(() => {
     if (
       routeState.kind !== "invite-room" ||
       !routeState.roomId ||
+      !isAuthResolved ||
       !authUser ||
       !inviteEnabled
     ) {
@@ -1151,6 +1276,7 @@ export default function Game() {
             isLoading: false,
             isJoining: false,
             isPlaying: false,
+            isRestarting: false,
             errorMessage: nextRoom.isInvalid
               ? "This invite room has invalid data and cannot be loaded safely."
               : "",
@@ -1163,6 +1289,7 @@ export default function Game() {
             isLoading: false,
             isJoining: false,
             isPlaying: false,
+            isRestarting: false,
             errorMessage:
               "This invite room is no longer available. Start a new match instead.",
           }));
@@ -1173,7 +1300,7 @@ export default function Game() {
     }
 
     return unsubscribe;
-  }, [authUser, inviteEnabled, routeState.kind, routeState.roomId]);
+  }, [authUser, inviteEnabled, isAuthResolved, routeState.kind, routeState.roomId]);
 
   useEffect(() => {
     if (!isCpuTurn) {
@@ -1400,7 +1527,20 @@ export default function Game() {
 
             <Board
               actions={
-                isInviteMode ? null : (
+                isInviteMode ? (
+                  canStartInviteRematch ? (
+                    <div className="board-toolbar" aria-label="Invite actions">
+                      <button
+                        type="button"
+                        className="new-game-button"
+                        onClick={handleStartInviteRematch}
+                        disabled={inviteRoomState.isRestarting}
+                      >
+                        Start next round
+                      </button>
+                    </div>
+                  ) : null
+                ) : (
                   <div className="board-toolbar" aria-label="Round actions">
                     {isMatchComplete ? (
                       <button
@@ -1522,6 +1662,7 @@ export default function Game() {
                 onInviteDisplayNameChange={handleInviteDisplayNameChange}
                 onCreateRoom={handleCreateInviteRoom}
                 onJoinRoom={handleJoinInviteRoom}
+                onStartNextRound={handleStartInviteRematch}
                 onCopyLink={handleCopyInviteLink}
                 onBackHome={handleBackHome}
                 onOpenInviteLobby={handleOpenInviteLobby}
@@ -1531,6 +1672,7 @@ export default function Game() {
                 isCreating={inviteRoomState.isCreating}
                 isJoining={inviteRoomState.isJoining}
                 isPlaying={inviteRoomState.isPlaying}
+                isRestarting={inviteRoomState.isRestarting}
                 errorMessage={
                   inviteRoomState.errorMessage ||
                   (inviteEntryState?.state === "blocked"
@@ -1540,6 +1682,7 @@ export default function Game() {
                 statusMessage={inviteRoomState.statusMessage}
                 copyStatus={inviteRoomState.copyStatus}
                 participantSymbol={inviteParticipantSymbol}
+                canStartNextRound={canStartInviteRematch}
               />
             ) : (
               <LocalRecordsPanel

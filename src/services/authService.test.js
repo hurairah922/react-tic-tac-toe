@@ -10,13 +10,17 @@ jest.mock("./supabaseClient", () => ({
 
 import {
   AUTH_SESSION_STORAGE_KEY,
+  clearPostLoginRedirectPath,
   PROFILE_STORAGE_KEY,
+  POST_LOGIN_REDIRECT_STORAGE_KEY,
   clearAuthSession,
   clearProfileName,
   getInitialAuthState,
   loadAuthSession,
+  loadPostLoginRedirectPath,
   loadProfileName,
   saveAuthSession,
+  savePostLoginRedirectPath,
   saveProfileName,
   saveProfileNameAsync,
   signOutAsync,
@@ -137,5 +141,21 @@ describe("authService", () => {
       message: "Signed out. Guest play is still available.",
     });
     expect(loadProfileName(authUser, storage)).toBe("Alex");
+  });
+
+  test("stores and clears a pending post-login redirect path", () => {
+    const storage = createMemoryStorage();
+
+    expect(savePostLoginRedirectPath("/play/invite/room-1", storage)).toBe(
+      "/play/invite/room-1"
+    );
+    expect(storage.getItem(POST_LOGIN_REDIRECT_STORAGE_KEY)).toBe(
+      "/play/invite/room-1"
+    );
+    expect(loadPostLoginRedirectPath(storage)).toBe("/play/invite/room-1");
+
+    clearPostLoginRedirectPath(storage);
+
+    expect(loadPostLoginRedirectPath(storage)).toBe("");
   });
 });

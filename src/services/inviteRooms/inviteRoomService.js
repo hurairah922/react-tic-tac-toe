@@ -165,6 +165,8 @@ function normalizeInviteErrorMessage(error) {
       return "That invite room has expired.";
     case "ROOM_WAITING":
       return "Waiting for the second player to join.";
+    case "ROOM_ACTIVE":
+      return "This invite match is still in progress.";
     case "ROOM_UNAVAILABLE":
       return "That invite room is unavailable right now.";
     case "NOT_A_PARTICIPANT":
@@ -292,6 +294,25 @@ export async function playInviteMove({ roomId, squareIndex }) {
 
   if (!room) {
     throw new Error("Could not save that move right now.");
+  }
+
+  return room;
+}
+
+export async function restartInviteRoom({ roomId }) {
+  const client = requireSupabaseClient();
+  const { data, error } = await client.rpc("restart_invite_room", {
+    p_room_id: String(roomId ?? "").trim(),
+  });
+
+  if (error) {
+    throw new Error(normalizeInviteErrorMessage(error));
+  }
+
+  const room = mapInviteRoomRecord(getRpcResultRow(data));
+
+  if (!room) {
+    throw new Error("Could not start the next round right now.");
   }
 
   return room;

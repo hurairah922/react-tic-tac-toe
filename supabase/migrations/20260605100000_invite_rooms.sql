@@ -429,8 +429,99 @@ begin
 end;
 $$;
 
+create or replace function public.restart_invite_room(
+  p_room_id uuid
+)
+returns public.invite_rooms
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  current_user_id uuid := auth.uid();
+  room public.invite_rooms;
+  previous_starter text;
+  next_starter text;
+begin
+  if current_user_id is null then
+    raise exception 'AUTH_REQUIRED';
+  end if;
+
+  select * into room
+  from public.invite_rooms
+  where id = p_room_id
+  for update;
+
+  if not found then
+    raise exception 'ROOM_NOT_FOUND';
+  end if;
+
+  if room.expires_at <= now() or room.status = 'expired' then
+    update public.invite_rooms
+    set status = 'expired', updated_at = now()
+    where id = p_room_id;
+    raise exception 'ROOM_EXPIRED';
+  end if;
+
+  if room.players_x_user_id = current_user_id or room.players_o_user_id = current_user_id then
+    null;
+  else
+    raise exception 'NOT_A_PARTICIPANT';
+  end if;
+
+  if room.players_o_user_id is null then
+    raise exception 'ROOM_WAITING';
+  end if;
+
+  if room.status <> 'complete' or room.winner is null then
+    raise exception 'ROOM_ACTIVE';
+  end if;
+
+  previous_starter := coalesce(room.moves -> 0 ->> 'player', 'X');
+  next_starter := case when previous_starter = 'X' then 'O' else 'X' end;
+
+  update public.invite_rooms
+  set
+    status = 'active',
+    board = array_fill(null::text, array[room.board_size * room.board_size]),
+    current_player = next_starter,
+    winner = null,
+    completed_at = null,
+    move_count = 0,
+    moves = '[]'::jsonb,
+    updated_at = now()
+  where id = p_room_id
+  returning * into room;
+
+  return room;
+end;
+$$;
+
 grant execute on function public.create_invite_room(integer, integer, text) to authenticated;
 grant execute on function public.join_invite_room(uuid, text) to authenticated;
 grant execute on function public.play_invite_move(uuid, integer) to authenticated;
+grant execute on function public.restart_invite_room(uuid) to authenticated;
 
-alter publication supabase_realtime add table public.invite_rooms;
+do $$
+begin
+  if exists (
+    select 1
+    from pg_publication
+    where pubname = 'supabase_realtime'
+  ) and not exists (
+    select 1
+    from pg_publication_rel publication_relation
+    join pg_publication publication
+      on publication.oid = publication_relation.prpubid
+    join pg_class relation
+      on relation.oid = publication_relation.prrelid
+    join pg_namespace schema_name
+      on schema_name.oid = relation.relnamespace
+    where publication.pubname = 'supabase_realtime'
+      and schema_name.nspname = 'public'
+      and relation.relname = 'invite_rooms'
+  ) then
+    alter publication supabase_realtime add table public.invite_rooms;
+  end if;
+end;
+$$;

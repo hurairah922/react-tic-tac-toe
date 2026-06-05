@@ -64,6 +64,14 @@ export function buildInviteRoomUrl(roomId, locationOverride) {
   return `${location.origin}${path}`;
 }
 
+export function getCurrentPath(locationOverride) {
+  const location = getLocation(locationOverride);
+
+  return `${normalizePathname(location.pathname)}${location.search || ""}${
+    location.hash || ""
+  }`;
+}
+
 export function navigateToPath(path, { replace = false } = {}) {
   if (typeof window === "undefined" || !window.history?.pushState) {
     return;
