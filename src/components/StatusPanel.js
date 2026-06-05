@@ -55,44 +55,34 @@ function StatusPanel({
     detail = `${lastMoveSummary} ${detail}`;
   }
 
+  const statusChips = [
+    `${isCpuMode ? "Human vs CPU" : "Human vs Human"}`,
+    `${boardSize}x${boardSize}`,
+    `${winLength} in a row`,
+    `Starter: ${playerDisplayNames[startingPlayer]} (${startingPlayer})`,
+  ];
+
+  if (isCpuMode) {
+    statusChips.push(`You are ${humanPlayerSymbol}`);
+    statusChips.push(`CPU: ${cpuDifficultyLabel}`);
+  }
+
   return (
-    <section className="status-panel" aria-label="Game status">
+    <section className="status-strip" aria-label="Game status">
       <div className="status-summary" aria-live="polite">
         <p className="eyebrow">Round status</p>
         <p className="status-text">{status}</p>
         <p className="status-detail">{detail}</p>
       </div>
 
-      <dl className="status-stats" aria-label="Game stats">
-        <div>
-          <dt>Current move</dt>
-          <dd>#{currentMove}</dd>
-        </div>
-        <div>
-          <dt>Round starter</dt>
-          <dd>{startingPlayerLabel}</dd>
-        </div>
-        <div>
-          <dt>Mode</dt>
-          <dd>{isCpuMode ? "Human vs CPU" : "Human vs Human"}</dd>
-        </div>
-        {isCpuMode ? (
-          <div>
-            <dt>CPU level</dt>
-            <dd>{cpuDifficultyLabel}</dd>
-          </div>
-        ) : null}
-        <div>
-          <dt>Board size</dt>
-          <dd>
-            {boardSize} x {boardSize}
-          </dd>
-        </div>
-        <div>
-          <dt>Win condition</dt>
-          <dd>{winLength} in a row</dd>
-        </div>
-      </dl>
+      <div className="status-chip-row" aria-label="Game summary">
+        {statusChips.map((chip) => (
+          <span className="status-chip" key={chip}>
+            {chip}
+          </span>
+        ))}
+        <span className="status-chip status-chip-strong">Move #{currentMove}</span>
+      </div>
     </section>
   );
 }

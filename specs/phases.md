@@ -203,6 +203,24 @@ Acceptance criteria:
 - Match results are validated before saving.
 - Stats separate mode, board size, and difficulty.
 
+
+## UX Refinement: Sidebar Controls, Compact History, and Undo
+
+Status: `Active`
+
+Goal:
+
+Improve game usability by keeping the board visible, moving secondary controls into a sidebar, and simplifying time travel.
+
+Acceptance criteria:
+
+- Setup controls and all move into a sidebar or compact panel.
+- Setup selections use dropdowns.
+- Move history uses a dropdown.
+- Undo works for Human vs Human and Human vs CPU.
+- New Game appears near the board after game completion.
+- Mobile layout keeps the board easy to access.
+
 ## Phase 9: Invite-Link Multiplayer
 
 Status: `Not Started`

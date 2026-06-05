@@ -9,7 +9,7 @@ const GAME_MODE_OPTIONS = [
   {
     value: "cpu",
     label: "Human vs CPU",
-    detail: "Play as X against a local CPU.",
+    detail: "Play against a local CPU.",
   },
 ];
 
@@ -57,104 +57,79 @@ function GameModeSelector({
   return (
     <section className="setup-section" aria-labelledby="game-mode-title">
       <div className="setup-section-copy">
-        <h3 id="game-mode-title">Choose who plays</h3>
-        <p>
-          Switch between local two-player play and a browser-only CPU opponent.
-        </p>
+        <h3 id="game-mode-title">Mode</h3>
+        <p>Switch between local play and a browser-only CPU opponent.</p>
       </div>
 
-      <fieldset
-        className="board-size-options game-mode-options"
-        style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}
-      >
-        <legend>Game mode</legend>
-        {GAME_MODE_OPTIONS.map((option) => {
-          const optionId = `game-mode-${option.value}`;
-          const isSelected = gameMode === option.value;
-
-          return (
-            <label
-              className={`board-size-option${
-                isSelected ? " board-size-option-selected" : ""
-              }`}
-              htmlFor={optionId}
-              key={option.value}
-            >
-              <input
-                id={optionId}
-                type="radio"
-                name="game-mode"
-                value={option.value}
-                checked={isSelected}
-                onChange={() => onGameModeChange(option.value)}
-              />
-              <span className="board-size-label">{option.label}</span>
-              <span className="board-size-rule">{option.detail}</span>
-            </label>
-          );
-        })}
-      </fieldset>
+      <label className="control-field" htmlFor="game-mode-select">
+        <span>Game mode</span>
+        <select
+          id="game-mode-select"
+          className="control-select"
+          value={gameMode}
+          onChange={(event) => onGameModeChange(event.target.value)}
+        >
+          {GAME_MODE_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        <small className="control-help">
+          {
+            GAME_MODE_OPTIONS.find((option) => option.value === gameMode)?.detail
+          }
+        </small>
+      </label>
 
       {isCpuMode ? (
-        <>
-          <fieldset className="board-size-options">
-            <legend>Choose your symbol</legend>
-            {CPU_SYMBOL_OPTIONS.map((option) => {
-              const optionId = `cpu-symbol-${option.value.toLowerCase()}`;
-              const isSelected = cpuPlayerSymbol === option.value;
+        <div className="setup-control-grid">
+          <label className="control-field" htmlFor="cpu-symbol-select">
+            <span>Your side</span>
+            <select
+              id="cpu-symbol-select"
+              className="control-select"
+              value={cpuPlayerSymbol}
+              onChange={(event) => onCpuPlayerSymbolChange(event.target.value)}
+            >
+              {CPU_SYMBOL_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <small className="control-help">
+              {
+                CPU_SYMBOL_OPTIONS.find(
+                  (option) => option.value === cpuPlayerSymbol
+                )?.detail
+              }
+            </small>
+          </label>
 
-              return (
-                <label
-                  className={`board-size-option${
-                    isSelected ? " board-size-option-selected" : ""
-                  }`}
-                  htmlFor={optionId}
-                  key={option.value}
-                >
-                  <input
-                    id={optionId}
-                    type="radio"
-                    name="cpu-symbol"
-                    value={option.value}
-                    checked={isSelected}
-                    onChange={() => onCpuPlayerSymbolChange(option.value)}
-                  />
-                  <span className="board-size-label">{option.label}</span>
-                  <span className="board-size-rule">{option.detail}</span>
-                </label>
-              );
-            })}
-          </fieldset>
-
-          <fieldset className="board-size-options">
-            <legend>CPU difficulty</legend>
-            {CPU_DIFFICULTY_OPTIONS.map((option) => {
-              const optionId = `cpu-difficulty-${option.value}`;
-              const isSelected = cpuDifficulty === option.value;
-
-              return (
-                <label
-                  className={`board-size-option${
-                    isSelected ? " board-size-option-selected" : ""
-                  }`}
-                  htmlFor={optionId}
-                  key={option.value}
-                >
-                  <input
-                    id={optionId}
-                    type="radio"
-                    name="cpu-difficulty"
-                    value={option.value}
-                    checked={isSelected}
-                    onChange={() => onCpuDifficultyChange(option.value)}
-                  />
-                  <span className="board-size-label">{option.label}</span>
-                  <span className="board-size-rule">{option.detail}</span>
-                </label>
-              );
-            })}
-          </fieldset>
-        </>
+          <label className="control-field" htmlFor="cpu-difficulty-select">
+            <span>CPU difficulty</span>
+            <select
+              id="cpu-difficulty-select"
+              className="control-select"
+              value={cpuDifficulty}
+              onChange={(event) => onCpuDifficultyChange(event.target.value)}
+            >
+              {CPU_DIFFICULTY_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <small className="control-help">
+              {
+                CPU_DIFFICULTY_OPTIONS.find(
+                  (option) => option.value === cpuDifficulty
+                )?.detail
+              }
+            </small>
+          </label>
+        </div>
       ) : null}
     </section>
   );

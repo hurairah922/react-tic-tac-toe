@@ -5,7 +5,6 @@ import BoardSizeSelector from "./BoardSizeSelector";
 import GameModeSelector from "./GameModeSelector";
 import LearnModal from "./LearnModal";
 import LocalRecordsPanel from "./LocalRecordsPanel";
-import MatchDisplayNamePanel from "./MatchDisplayNamePanel";
 import MoveHistory from "./MoveHistory";
 import StatusPanel from "./StatusPanel";
 import {
@@ -34,12 +33,11 @@ import {
   DEFAULT_STARTING_PLAYER,
   getAlternatePlayer,
   getPlayerForMove,
+  getUndoMoveTarget,
 } from "../utils/matchFlow";
 import {
-  DISPLAY_NAME_LIMIT,
   createDefaultMatchDisplayNames,
   formatPlayerLabel,
-  normalizeDisplayName,
 } from "../utils/playerIdentity";
 import { chooseCpuMove } from "../utils/cpuPlayer";
 import {
@@ -59,35 +57,8 @@ function createInitialEntry(boardSize) {
   };
 }
 
-function createMatchNameCustomizationState() {
-  return {
-    cpu: { X: false, O: false },
-    human: { X: false, O: false },
-  };
-}
-
 function getHumanPlayerSymbol(cpuPlayerSymbol) {
   return cpuPlayerSymbol === "X" ? "O" : "X";
-}
-
-function swapCpuMarkerValues(markerValues) {
-  return {
-    X: markerValues.O,
-    O: markerValues.X,
-  };
-}
-
-function syncMatchDisplayNames(previousNames, customizedNames, defaultNames) {
-  return {
-    cpu: {
-      X: customizedNames.cpu.X ? previousNames.cpu.X : defaultNames.cpu.X,
-      O: customizedNames.cpu.O ? previousNames.cpu.O : defaultNames.cpu.O,
-    },
-    human: {
-      X: customizedNames.human.X ? previousNames.human.X : defaultNames.human.X,
-      O: customizedNames.human.O ? previousNames.human.O : defaultNames.human.O,
-    },
-  };
 }
 
 export default function Game() {
@@ -117,12 +88,6 @@ export default function Game() {
     isLoading: false,
     errorMessage: "",
   }));
-  const [customizedNames, setCustomizedNames] = useState(
-    createMatchNameCustomizationState
-  );
-  const [matchDisplayNames, setMatchDisplayNames] = useState(() =>
-    createDefaultMatchDisplayNames(initialAuthState)
-  );
   const learnButtonRef = useRef(null);
   const cpuTimeoutRef = useRef(null);
   const cpuTurnVersionRef = useRef(0);
@@ -156,32 +121,11 @@ export default function Game() {
   const isDraw = !winnerInfo && isBoardFull(currentEntry.squares);
   const isCpuTurn =
     isCpuMode && currentPlayer === cpuPlayerSymbol && !winnerInfo && !isDraw;
-  const defaultMatchDisplayNames = useMemo(
+  const matchDisplayNames = useMemo(
     () => createDefaultMatchDisplayNames({ authUser, profileName, cpuPlayerSymbol }),
     [authUser, cpuPlayerSymbol, profileName]
   );
-  const resolvedMatchDisplayNames = useMemo(
-    () => ({
-      cpu: {
-        X:
-          normalizeDisplayName(matchDisplayNames.cpu.X) ||
-          defaultMatchDisplayNames.cpu.X,
-        O:
-          normalizeDisplayName(matchDisplayNames.cpu.O) ||
-          defaultMatchDisplayNames.cpu.O,
-      },
-      human: {
-        X:
-          normalizeDisplayName(matchDisplayNames.human.X) ||
-          defaultMatchDisplayNames.human.X,
-        O:
-          normalizeDisplayName(matchDisplayNames.human.O) ||
-          defaultMatchDisplayNames.human.O,
-      },
-    }),
-    [defaultMatchDisplayNames, matchDisplayNames]
-  );
-  const playerDisplayNames = resolvedMatchDisplayNames[gameMode];
+  const playerDisplayNames = matchDisplayNames[gameMode];
   const currentRecordBucket = useMemo(
     () => getRecordBucket(recordsState.records, { gameMode, boardSize }),
     [boardSize, gameMode, recordsState.records]
@@ -204,7 +148,6 @@ export default function Game() {
       currentPlayer
     )}`;
   }, [currentPlayer, isDraw, playerDisplayNames, winner]);
-
   historyRef.current = history;
   currentMoveRef.current = currentMove;
   boardRulesRef.current = boardRules;
@@ -306,6 +249,20 @@ export default function Game() {
     resetMatch({ nextStarter: nextStartingPlayer });
   }, [invalidatePendingCpuTurn, nextStartingPlayer, resetMatch]);
 
+  const undoMoveTarget = getUndoMoveTarget(currentMove, gameMode);
+  const canUndo = undoMoveTarget !== null;
+
+  const handleUndo = useCallback(() => {
+    if (undoMoveTarget === null) {
+      return;
+    }
+
+    invalidatePendingCpuTurn();
+    matchWasTimeTraveledRef.current = true;
+    setHistory((previousHistory) => previousHistory.slice(0, undoMoveTarget + 1));
+    setCurrentMove(undoMoveTarget);
+  }, [invalidatePendingCpuTurn, undoMoveTarget]);
+
   const handleBoardSizeChange = useCallback(
     (nextBoardSize) => {
       const nextBoardRules = createBoardRules(nextBoardSize);
@@ -355,14 +312,6 @@ export default function Game() {
 
       invalidatePendingCpuTurn();
       setCpuPlayerSymbol(nextCpuPlayerSymbol);
-      setMatchDisplayNames((previousNames) => ({
-        ...previousNames,
-        cpu: swapCpuMarkerValues(previousNames.cpu),
-      }));
-      setCustomizedNames((previousState) => ({
-        ...previousState,
-        cpu: swapCpuMarkerValues(previousState.cpu),
-      }));
       resetMatch();
     },
     [cpuPlayerSymbol, invalidatePendingCpuTurn, resetMatch]
@@ -499,92 +448,6 @@ export default function Game() {
       setIsAuthBusy(false);
     }
   }, [applyAuthState]);
-
-  const handleDisplayNameChange = useCallback(
-    (mode, player, nextValue) => {
-      const safeValue = nextValue.slice(0, DISPLAY_NAME_LIMIT);
-      const defaultValue = defaultMatchDisplayNames[mode][player];
-      const isCustomized =
-        safeValue === ""
-          ? true
-          : normalizeDisplayName(safeValue) !== normalizeDisplayName(defaultValue);
-
-      setMatchDisplayNames((previousNames) => ({
-        ...previousNames,
-        [mode]: {
-          ...previousNames[mode],
-          [player]: safeValue,
-        },
-      }));
-      setCustomizedNames((previousState) => ({
-        ...previousState,
-        [mode]: {
-          ...previousState[mode],
-          [player]: isCustomized,
-        },
-      }));
-    },
-    [defaultMatchDisplayNames]
-  );
-
-  const handleDisplayNameBlur = useCallback(
-    (mode, player) => {
-      const currentValue = matchDisplayNames[mode][player];
-      const defaultValue = defaultMatchDisplayNames[mode][player];
-      const normalizedValue = normalizeDisplayName(currentValue);
-      const resolvedValue = normalizedValue || defaultValue;
-
-      setMatchDisplayNames((previousNames) => ({
-        ...previousNames,
-        [mode]: {
-          ...previousNames[mode],
-          [player]: resolvedValue,
-        },
-      }));
-      setCustomizedNames((previousState) => ({
-        ...previousState,
-        [mode]: {
-          ...previousState[mode],
-          [player]:
-            normalizedValue !== "" &&
-            normalizedValue !== normalizeDisplayName(defaultValue),
-        },
-      }));
-    },
-    [defaultMatchDisplayNames, matchDisplayNames]
-  );
-
-  const handleDisplayNameReset = useCallback(
-    (mode, player) => {
-      const defaultValue = defaultMatchDisplayNames[mode][player];
-
-      setMatchDisplayNames((previousNames) => ({
-        ...previousNames,
-        [mode]: {
-          ...previousNames[mode],
-          [player]: defaultValue,
-        },
-      }));
-      setCustomizedNames((previousState) => ({
-        ...previousState,
-        [mode]: {
-          ...previousState[mode],
-          [player]: false,
-        },
-      }));
-    },
-    [defaultMatchDisplayNames]
-  );
-
-  useEffect(() => {
-    setMatchDisplayNames((previousNames) =>
-      syncMatchDisplayNames(
-        previousNames,
-        customizedNames,
-        defaultMatchDisplayNames
-      )
-    );
-  }, [customizedNames, defaultMatchDisplayNames]);
 
   useEffect(() => {
     let isMounted = true;
@@ -858,78 +721,17 @@ export default function Game() {
     <main className="app-shell">
       <section className="game-card" aria-label="Tic-tac-toe game">
         <header className="game-header">
-          <div>
+          <div className="hero-stack">
             <p className="eyebrow">A Modern</p>
             <h1>Tic-Tac-Toe</h1>
             <p className="game-header-copy">
               Choose a mode, pick a board, and jump straight into the round.
             </p>
           </div>
-
-          <AccountPanel
-            authUser={authUser}
-            profileName={profileName}
-            onSignIn={handleSignIn}
-            onSignOut={handleSignOut}
-            onSaveProfileName={handleSaveProfileName}
-            authStatusMessage={authStatusMessage}
-            authErrorMessage={authErrorMessage}
-            isAuthBusy={isAuthBusy}
-          />
         </header>
 
-        <section className="board-setup game-setup-panel" aria-labelledby="game-setup-title">
-          <div className="board-setup-copy">
-            <p className="eyebrow">Game setup</p>
-            <h2 id="game-setup-title">Choose your match settings</h2>
-            <p>
-              Pick who plays and the board size before jumping into the round.
-            </p>
-          </div>
-
-          <div className="setup-layout">
-            <GameModeSelector
-              gameMode={gameMode}
-              cpuDifficulty={cpuDifficulty}
-              cpuPlayerSymbol={cpuPlayerSymbol}
-              onGameModeChange={handleGameModeChange}
-              onCpuDifficultyChange={handleCpuDifficultyChange}
-              onCpuPlayerSymbolChange={handleCpuPlayerSymbolChange}
-            />
-
-            <BoardSizeSelector
-              boardRules={boardRules}
-              onBoardSizeChange={handleBoardSizeChange}
-            />
-
-            <MatchDisplayNamePanel
-              gameMode={gameMode}
-              cpuPlayerSymbol={cpuPlayerSymbol}
-              matchDisplayNames={matchDisplayNames}
-              defaultMatchDisplayNames={defaultMatchDisplayNames}
-              customizedNames={customizedNames}
-              onDisplayNameChange={handleDisplayNameChange}
-              onDisplayNameBlur={handleDisplayNameBlur}
-              onDisplayNameReset={handleDisplayNameReset}
-            />
-          </div>
-        </section>
-
-        <div className="primary-layout">
-          <div className="board-panel">
-            <Board
-              squares={currentEntry.squares}
-              boardSize={boardSize}
-              onPlay={handlePlay}
-              winningLine={winnerInfo?.line ?? []}
-              isGameOver={isMatchComplete}
-              isInteractionDisabled={isCpuTurn}
-              isCpuTurn={isCpuTurn}
-              turnNotice={boardTurnNotice}
-            />
-          </div>
-
-          <aside className="primary-sidebar">
+        <div className="game-layout">
+          <section className="game-main">
             <StatusPanel
               currentMove={currentMove}
               isDraw={isDraw}
@@ -948,72 +750,115 @@ export default function Game() {
               playerDisplayNames={playerDisplayNames}
             />
 
-            <section className="sidebar-card sidebar-actions" aria-label="Round actions">
-              <div>
-                <p className="eyebrow">Controls</p>
-                <h2>{isMatchComplete ? "Next round" : "Start again"}</h2>
-              </div>
+            <Board
+              actions={
+                <div className="board-toolbar" aria-label="Round actions">
+                  {isMatchComplete ? (
+                    <button
+                      type="button"
+                      className="new-game-button"
+                      onClick={handleNewGame}
+                    >
+                      New Game
+                    </button>
+                  ) : null}
 
-              <div className="sidebar-action-buttons">
-                <button
-                  type="button"
-                  className={`new-game-button${
-                    isMatchComplete ? "" : " action-button-hidden"
-                  }`}
-                  onClick={handleNewGame}
-                  disabled={!isMatchComplete}
-                  aria-hidden={!isMatchComplete}
-                  tabIndex={isMatchComplete ? 0 : -1}
-                >
-                  New Game
-                </button>
+                  <button
+                    type="button"
+                    className="history-sort-button"
+                    onClick={handleUndo}
+                    disabled={!canUndo}
+                  >
+                    Undo
+                  </button>
 
-                <button
-                  type="button"
-                  className="reset-button"
-                  onClick={handleReset}
-                  disabled={history.length === 1}
-                >
-                  Reset Game
-                </button>
-              </div>
-            </section>
-          </aside>
-        </div>
+                  <button
+                    type="button"
+                    className="reset-button"
+                    onClick={handleReset}
+                    disabled={history.length === 1}
+                  >
+                    Reset Game
+                  </button>
+                </div>
+              }
+              squares={currentEntry.squares}
+              boardSize={boardSize}
+              onPlay={handlePlay}
+              winningLine={winnerInfo?.line ?? []}
+              isGameOver={isMatchComplete}
+              isInteractionDisabled={isCpuTurn}
+              isCpuTurn={isCpuTurn}
+              turnNotice={boardTurnNotice}
+            />
 
-        <div className="secondary-layout">
-          <div className="secondary-main">
-            <div className="sidebar-card history-card">
-              <div className="sidebar-header">
-                <div>
-                  <p className="eyebrow">History</p>
-                  <h2>Time travel</h2>
+            {history.length > 1 ? (
+              <section className="sidebar-card history-card history-main-card">
+                <div className="sidebar-header">
+                  <div>
+                    <p className="eyebrow">History</p>
+                    <h2>Time travel</h2>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="history-sort-button"
+                    onClick={handleToggleSort}
+                    aria-pressed={!isAscending}
+                    aria-label={`Show moves in ${
+                      isAscending ? "descending" : "ascending"
+                    } order`}
+                  >
+                    {isAscending ? "Newest first" : "Oldest first"}
+                  </button>
                 </div>
 
-                <button
-                  type="button"
-                  className="history-sort-button"
-                  onClick={handleToggleSort}
-                  aria-pressed={!isAscending}
-                  aria-label={`Show moves in ${
-                    isAscending ? "descending" : "ascending"
-                  } order`}
-                >
-                  {isAscending ? "Newest first" : "Oldest first"}
-                </button>
+                <MoveHistory
+                  history={history}
+                  currentMove={currentMove}
+                  isAscending={isAscending}
+                  onJumpTo={handleJumpTo}
+                  playerDisplayNames={playerDisplayNames}
+                />
+              </section>
+            ) : null}
+          </section>
+
+          <aside className="game-sidebar">
+            <AccountPanel
+              authUser={authUser}
+              profileName={profileName}
+              onSignIn={handleSignIn}
+              onSignOut={handleSignOut}
+              onSaveProfileName={handleSaveProfileName}
+              authStatusMessage={authStatusMessage}
+              authErrorMessage={authErrorMessage}
+              isAuthBusy={isAuthBusy}
+            />
+
+            <section className="sidebar-card control-panel" aria-labelledby="game-setup-title">
+              <div className="sidebar-panel-copy">
+                <p className="eyebrow">Match settings</p>
+                <h2 id="game-setup-title">Change setup without leaving the board</h2>
               </div>
 
-              <MoveHistory
-                history={history}
-                currentMove={currentMove}
-                isAscending={isAscending}
-                onJumpTo={handleJumpTo}
-                playerDisplayNames={playerDisplayNames}
-              />
-            </div>
-          </div>
+              <div className="setup-layout">
+                <GameModeSelector
+                  gameMode={gameMode}
+                  cpuDifficulty={cpuDifficulty}
+                  cpuPlayerSymbol={cpuPlayerSymbol}
+                  onGameModeChange={handleGameModeChange}
+                  onCpuDifficultyChange={handleCpuDifficultyChange}
+                  onCpuPlayerSymbolChange={handleCpuPlayerSymbolChange}
+                />
 
-          <aside className="secondary-sidebar">
+                <BoardSizeSelector
+                  boardRules={boardRules}
+                  onBoardSizeChange={handleBoardSizeChange}
+                />
+              </div>
+            </section>
+
             <LocalRecordsPanel
               gameMode={gameMode}
               boardSize={boardSize}

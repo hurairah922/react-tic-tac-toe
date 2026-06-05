@@ -1,6 +1,7 @@
 import {
   DEFAULT_STARTING_PLAYER,
   getAlternatePlayer,
+  getUndoMoveTarget,
   getPlayerForMove,
 } from "./matchFlow";
 
@@ -19,5 +20,18 @@ describe("matchFlow", () => {
     expect(getPlayerForMove("X", 1)).toBe("O");
     expect(getPlayerForMove("O", 0)).toBe("O");
     expect(getPlayerForMove("O", 3)).toBe("X");
+  });
+
+  test("undoes one move in human vs human mode", () => {
+    expect(getUndoMoveTarget(0, "human")).toBeNull();
+    expect(getUndoMoveTarget(1, "human")).toBe(0);
+    expect(getUndoMoveTarget(4, "human")).toBe(3);
+  });
+
+  test("undoes a full human and cpu turn pair in cpu mode", () => {
+    expect(getUndoMoveTarget(0, "cpu")).toBeNull();
+    expect(getUndoMoveTarget(1, "cpu")).toBeNull();
+    expect(getUndoMoveTarget(2, "cpu")).toBe(0);
+    expect(getUndoMoveTarget(5, "cpu")).toBe(3);
   });
 });

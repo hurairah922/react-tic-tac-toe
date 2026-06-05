@@ -10,3 +10,8 @@ export function getPlayerForMove(startingPlayer, moveCount) {
     : getAlternatePlayer(startingPlayer);
 }
 
+export function getUndoMoveTarget(currentMove, gameMode) {
+  const undoDistance = gameMode === "cpu" ? 2 : 1;
+
+  return currentMove >= undoDistance ? currentMove - undoDistance : null;
+}

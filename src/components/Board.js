@@ -3,6 +3,7 @@ import Square from "./Square";
 import { DEFAULT_BOARD_RULES } from "../utils/gameLogic";
 
 function Board({
+  actions,
   squares,
   boardSize = DEFAULT_BOARD_RULES.boardSize,
   onPlay,
@@ -49,15 +50,19 @@ function Board({
 
   return (
     <section className="board-card" aria-labelledby="board-heading">
-      <div className="board-copy">
-        <p className="eyebrow">Board</p>
-        {isGameOver ? (
-          <h2 id="board-heading">Game Over</h2>
-        ) : isCpuTurn ? (
-          <h2 id="board-heading">CPU is thinking</h2>
-        ) : (
-          <h2 id="board-heading">Make your move</h2>
-        )}
+      <div className="board-card-header">
+        <div className="board-copy">
+          <p className="eyebrow">Board</p>
+          {isGameOver ? (
+            <h2 id="board-heading">Game Over</h2>
+          ) : isCpuTurn ? (
+            <h2 id="board-heading">CPU is thinking</h2>
+          ) : (
+            <h2 id="board-heading">Make your move</h2>
+          )}
+        </div>
+
+        {actions ? <div className="board-card-actions">{actions}</div> : null}
       </div>
 
       <div

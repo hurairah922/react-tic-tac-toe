@@ -44,11 +44,8 @@ function MatchDisplayNamePanel({
   return (
     <section className="setup-section" aria-labelledby="match-display-name-title">
       <div className="setup-section-copy">
-        <h3 id="match-display-name-title">Match display names</h3>
-        <p>
-          Edit the names shown during this round without changing records or the
-          current board state.
-        </p>
+        <h3 id="match-display-name-title">Display names</h3>
+        <p>Shown in turns, wins, and move history for this round only.</p>
       </div>
 
       <div className="display-name-grid">
