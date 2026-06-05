@@ -17,13 +17,10 @@ import {
   subscribeToAuthState,
 } from "../services/authService";
 import {
-  clearLocalRecords,
   createDefaultLocalRecords,
   getRecordBucket,
   hasRecordedGames,
   loadLocalRecords,
-  saveLocalRecords,
-  updateRecordsForResult,
 } from "../utils/localRecords";
 import {
   calculateWinner,
@@ -45,6 +42,12 @@ import {
   normalizeDisplayName,
 } from "../utils/playerIdentity";
 import { chooseCpuMove } from "../utils/cpuPlayer";
+import {
+  clearRecords,
+  loadRecords,
+  saveCompletedMatchResult,
+  shouldUseCloudRecords,
+} from "../services/records/recordsService";
 
 const CPU_MOVE_DELAY_MS = 450;
 
@@ -91,12 +94,17 @@ export default function Game() {
   const [isLearnModalOpen, setIsLearnModalOpen] = useState(false);
   const [gameMode, setGameMode] = useState("cpu");
   const [cpuDifficulty, setCpuDifficulty] = useState("easy");
-  const [localRecords, setLocalRecords] = useState(() => loadLocalRecords());
   const [authUser, setAuthUser] = useState(initialAuthState.authUser);
   const [profileName, setProfileName] = useState(initialAuthState.profileName);
   const [authStatusMessage, setAuthStatusMessage] = useState("");
   const [authErrorMessage, setAuthErrorMessage] = useState("");
   const [isAuthBusy, setIsAuthBusy] = useState(false);
+  const [recordsState, setRecordsState] = useState(() => ({
+    source: "local",
+    records: loadLocalRecords(),
+    isLoading: false,
+    errorMessage: "",
+  }));
   const [customizedNames, setCustomizedNames] = useState(
     createMatchNameCustomizationState
   );
@@ -115,6 +123,9 @@ export default function Game() {
   const gameModeRef = useRef(gameMode);
   const cpuDifficultyRef = useRef(cpuDifficulty);
   const startingPlayerRef = useRef(startingPlayer);
+  const authUserRef = useRef(authUser);
+  const recordsRef = useRef(recordsState.records);
+  const recordsSourceRef = useRef(recordsState.source);
 
   const currentEntry = history[currentMove];
   const { boardSize, winLength } = boardRules;
@@ -156,12 +167,12 @@ export default function Game() {
   );
   const playerDisplayNames = resolvedMatchDisplayNames[gameMode];
   const currentRecordBucket = useMemo(
-    () => getRecordBucket(localRecords, { gameMode, boardSize }),
-    [boardSize, gameMode, localRecords]
+    () => getRecordBucket(recordsState.records, { gameMode, boardSize }),
+    [boardSize, gameMode, recordsState.records]
   );
   const canClearLocalRecords = useMemo(
-    () => hasRecordedGames(localRecords),
-    [localRecords]
+    () => hasRecordedGames(recordsState.records),
+    [recordsState.records]
   );
   const boardTurnNotice = useMemo(() => {
     if (winner) {
@@ -184,6 +195,9 @@ export default function Game() {
   gameModeRef.current = gameMode;
   cpuDifficultyRef.current = cpuDifficulty;
   startingPlayerRef.current = startingPlayer;
+  authUserRef.current = authUser;
+  recordsRef.current = recordsState.records;
+  recordsSourceRef.current = recordsState.source;
 
   const invalidatePendingCpuTurn = useCallback(() => {
     cpuTurnVersionRef.current += 1;
@@ -331,19 +345,43 @@ export default function Game() {
   }, []);
 
   const handleClearRecords = useCallback(() => {
+    const isCloudSource = recordsSourceRef.current === "cloud";
     const shouldClear =
       typeof window === "undefined" || typeof window.confirm !== "function"
         ? true
         : window.confirm(
-            "Clear all local Tic-Tac-Toe records stored in this browser?"
+            isCloudSource
+              ? "Clear all cloud Tic-Tac-Toe records saved to this account?"
+              : "Clear all local Tic-Tac-Toe records stored in this browser?"
           );
 
     if (!shouldClear) {
       return;
     }
 
-    clearLocalRecords();
-    setLocalRecords(createDefaultLocalRecords());
+    setRecordsState((previousState) => ({
+      ...previousState,
+      isLoading: isCloudSource,
+      errorMessage: "",
+    }));
+
+    clearRecords({ authUser: authUserRef.current })
+      .then((nextRecordsState) => {
+        setRecordsState({
+          ...nextRecordsState,
+          isLoading: false,
+          errorMessage: "",
+        });
+      })
+      .catch((error) => {
+        setRecordsState((previousState) => ({
+          ...previousState,
+          isLoading: false,
+          errorMessage:
+            error?.message ||
+            "Could not clear cloud records right now. Gameplay is still available.",
+        }));
+      });
   }, []);
 
   const applyAuthState = useCallback((nextAuthState) => {
@@ -555,6 +593,49 @@ export default function Game() {
   }, [applyAuthState]);
 
   useEffect(() => {
+    let isMounted = true;
+    const nextSource = shouldUseCloudRecords(authUser) ? "cloud" : "local";
+
+    setRecordsState((previousState) => ({
+      ...previousState,
+      source: nextSource,
+      isLoading: nextSource === "cloud",
+      errorMessage: "",
+    }));
+
+    loadRecords({ authUser })
+      .then((nextRecordsState) => {
+        if (!isMounted) {
+          return;
+        }
+
+        setRecordsState({
+          ...nextRecordsState,
+          isLoading: false,
+          errorMessage: "",
+        });
+      })
+      .catch((error) => {
+        if (!isMounted) {
+          return;
+        }
+
+        setRecordsState({
+          source: nextSource,
+          records: createDefaultLocalRecords(),
+          isLoading: false,
+          errorMessage:
+            error?.message ||
+            "Could not load cloud records right now. Gameplay is still available.",
+        });
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [authUser]);
+
+  useEffect(() => {
     if (!isCpuTurn) {
       invalidatePendingCpuTurn();
       return undefined;
@@ -647,17 +728,84 @@ export default function Game() {
 
     recordedMatchIdRef.current = activeMatchIdRef.current;
     setNextStartingPlayer(getAlternatePlayer(startingPlayer));
-    setLocalRecords((previousRecords) =>
-      saveLocalRecords(
-        updateRecordsForResult(previousRecords, {
-          gameMode,
-          boardSize,
-          winner,
-          isDraw,
-        })
-      )
-    );
-  }, [boardSize, currentMove, gameMode, history.length, isDraw, startingPlayer, winner]);
+    const matchMoves = history.slice(1).map((entry, index) => ({
+      move: index + 1,
+      player: entry.player,
+      row: entry.moveLocation?.row,
+      col: entry.moveLocation?.col,
+      squareIndex:
+        entry.moveLocation?.row && entry.moveLocation?.col
+          ? (entry.moveLocation.row - 1) * boardSize + (entry.moveLocation.col - 1)
+          : null,
+    }));
+    const authUserAtSave = authUser;
+    const sourceAtSave = shouldUseCloudRecords(authUserAtSave) ? "cloud" : "local";
+    const saveKey = `${activeMatchIdRef.current}:${authUserAtSave?.id ?? "guest"}`;
+
+    saveCompletedMatchResult({
+      authUser: authUserAtSave,
+      currentRecords: recordsRef.current,
+      matchData: {
+        gameMode,
+        boardSize,
+        cpuDifficulty: gameMode === "cpu" ? cpuDifficulty : null,
+        winner,
+        isDraw,
+        finalSquares: currentEntry.squares,
+        playerDisplayNames,
+        moves: matchMoves,
+        completedAt: Date.now(),
+      },
+      saveKey,
+    }).then((saveResult) => {
+      if (!saveResult.didSave) {
+        if (
+          saveResult.errorMessage &&
+          sourceAtSave === "cloud" &&
+          recordsSourceRef.current === "cloud" &&
+          authUserRef.current?.id === authUserAtSave?.id
+        ) {
+          setRecordsState((previousState) => ({
+            ...previousState,
+            errorMessage: saveResult.errorMessage,
+          }));
+        }
+
+        return;
+      }
+
+      if (sourceAtSave === "cloud") {
+        if (
+          recordsSourceRef.current !== "cloud" ||
+          authUserRef.current?.id !== authUserAtSave?.id
+        ) {
+          return;
+        }
+      } else if (recordsSourceRef.current !== "local") {
+        return;
+      }
+
+      setRecordsState((previousState) => ({
+        ...previousState,
+        source: saveResult.source,
+        records: saveResult.records,
+        errorMessage: "",
+      }));
+    });
+  }, [
+    authUser,
+    boardSize,
+    cpuDifficulty,
+    currentEntry.squares,
+    currentMove,
+    gameMode,
+    history,
+    history.length,
+    isDraw,
+    playerDisplayNames,
+    startingPlayer,
+    winner,
+  ]);
 
   const isMatchComplete = Boolean(winnerInfo) || isDraw;
 
@@ -820,8 +968,11 @@ export default function Game() {
               gameMode={gameMode}
               boardSize={boardSize}
               records={currentRecordBucket}
+              source={recordsState.source}
+              isLoading={recordsState.isLoading}
+              errorMessage={recordsState.errorMessage}
               onClear={handleClearRecords}
-              isClearDisabled={!canClearLocalRecords}
+              isClearDisabled={!canClearLocalRecords || recordsState.isLoading}
             />
 
             <div className="learn-callout">
