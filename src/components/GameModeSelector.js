@@ -11,6 +11,11 @@ const GAME_MODE_OPTIONS = [
     label: "Human vs CPU",
     detail: "Play against a local CPU.",
   },
+  {
+    value: "invite",
+    label: "Invite multiplayer",
+    detail: "Create a private share link for a signed-in opponent.",
+  },
 ];
 
 const CPU_DIFFICULTY_OPTIONS = [
@@ -58,7 +63,7 @@ function GameModeSelector({
     <section className="setup-section" aria-labelledby="game-mode-title">
       <div className="setup-section-copy">
         <h3 id="game-mode-title">Mode</h3>
-        <p>Switch between local play and a browser-only CPU opponent.</p>
+        <p>Switch between local play, the local CPU, or a private invite room.</p>
       </div>
 
       <label className="control-field" htmlFor="game-mode-select">

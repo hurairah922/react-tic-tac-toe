@@ -478,6 +478,14 @@ button:disabled {
   box-shadow: 0 12px 22px rgba(24, 128, 93, 0.1);
 }
 
+.board-size-button:disabled {
+  transform: none;
+  border-color: rgba(104, 91, 87, 0.18);
+  background: rgba(255, 248, 238, 0.78);
+  color: rgba(104, 91, 87, 0.72);
+  box-shadow: none;
+}
+
 .board-size-button:focus-visible {
   outline: 3px solid var(--focus);
   outline-offset: 3px;
@@ -592,6 +600,62 @@ button:disabled {
 .display-name-default {
   color: var(--muted);
   font-size: 0.9rem;
+}
+
+.invite-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.invite-room-summary {
+  display: grid;
+  gap: 14px;
+}
+
+.invite-share-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.invite-share-field {
+  min-width: 0;
+}
+
+.invite-share-field input[readonly] {
+  color: var(--text);
+}
+
+.invite-player-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.invite-player-list div {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: rgba(255, 253, 249, 0.82);
+}
+
+.invite-player-list dt {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.invite-player-list dd {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
 }
 
 .learn-callout {
@@ -1247,6 +1311,10 @@ button:disabled {
   }
 
   .display-name-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .invite-share-row {
     grid-template-columns: 1fr;
   }
 

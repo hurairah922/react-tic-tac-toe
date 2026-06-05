@@ -4,7 +4,7 @@ import {
   SUPPORTED_BOARD_SIZES,
 } from "../utils/gameLogic";
 
-function BoardSizeSelector({ boardRules, onBoardSizeChange }) {
+function BoardSizeSelector({ boardRules, onBoardSizeChange, disabled = false }) {
   return (
     <section className="setup-section" aria-labelledby="board-setup-title">
       <div className="setup-section-copy">
@@ -26,6 +26,7 @@ function BoardSizeSelector({ boardRules, onBoardSizeChange }) {
               className={`board-size-button${
                 isSelected ? " board-size-button-selected" : ""
               }`}
+              disabled={disabled}
               onClick={() => onBoardSizeChange(boardSize)}
               key={boardSize}
             >

@@ -16,6 +16,9 @@ function StatusPanel({
   lastMovePlayer,
   lastMoveLocation,
   playerDisplayNames,
+  statusOverride = "",
+  detailOverride = "",
+  statusChipsOverride = null,
 }) {
   const isCpuMode = gameMode === "cpu";
   const nextPlayer = xIsNext ? "X" : "O";
@@ -67,6 +70,19 @@ function StatusPanel({
     statusChips.push(`CPU: ${cpuDifficultyLabel}`);
   }
 
+  if (statusOverride) {
+    status = statusOverride;
+  }
+
+  if (detailOverride) {
+    detail = detailOverride;
+  }
+
+  const renderedStatusChips =
+    Array.isArray(statusChipsOverride) && statusChipsOverride.length > 0
+      ? statusChipsOverride
+      : statusChips;
+
   return (
     <section className="status-strip" aria-label="Game status">
       <div className="status-summary" aria-live="polite">
@@ -76,7 +92,7 @@ function StatusPanel({
       </div>
 
       <div className="status-chip-row" aria-label="Game summary">
-        {statusChips.map((chip) => (
+        {renderedStatusChips.map((chip) => (
           <span className="status-chip" key={chip}>
             {chip}
           </span>
