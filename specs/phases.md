@@ -206,7 +206,7 @@ Acceptance criteria:
 
 ## UX Refinement: Sidebar Controls, Compact History, and Undo
 
-Status: `Active`
+Status: `Done`
 
 Goal:
 
