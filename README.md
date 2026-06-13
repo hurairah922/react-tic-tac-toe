@@ -21,6 +21,14 @@ The current app is a frontend-only React game with:
 
 No backend, accounts, CPU mode, custom board sizes, records, or multiplayer are implemented yet.
 
+## Game Controls and Status Chips
+
+The game summary/status chip row is the primary place for both viewing and updating active game settings.
+
+The chips show the current game configuration, including the selected mode, board, player state, and CPU difficulty where relevant. Interactive chips let players change those settings directly from the always-visible status area instead of using a separate setup panel.
+
+This keeps the most important game controls in one consistent location, reduces duplicated UI, and makes the game easier to understand while playing.
+
 ## Active Feature
 
 The active feature is documented in `specs/features/active.md`.

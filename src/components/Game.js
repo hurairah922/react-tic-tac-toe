@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AccountPanel from "./AccountPanel";
 import Board from "./Board";
-import BoardSizeSelector from "./BoardSizeSelector";
-import GameModeSelector from "./GameModeSelector";
 import InviteMatchPanel from "./InviteMatchPanel";
 import LearnModal from "./LearnModal";
 import LocalRecordsPanel from "./LocalRecordsPanel";
@@ -47,6 +45,7 @@ import {
   DEFAULT_BOARD_RULES,
   getMoveLocation,
   isBoardFull,
+  SUPPORTED_BOARD_SIZES,
 } from "../utils/gameLogic";
 import {
   DEFAULT_STARTING_PLAYER,
@@ -76,6 +75,52 @@ import {
 } from "../utils/inviteRoutes";
 
 const CPU_MOVE_DELAY_MS = 450;
+const GAME_MODE_OPTIONS = [
+  {
+    value: "human",
+    label: "Human vs Human",
+    detail: "Two players share the same board.",
+  },
+  {
+    value: "cpu",
+    label: "Human vs CPU",
+    detail: "Play against a local CPU.",
+  },
+  {
+    value: "invite",
+    label: "Invite multiplayer",
+    detail: "Create a private share link for a signed-in opponent.",
+  },
+];
+const CPU_DIFFICULTY_OPTIONS = [
+  {
+    value: "easy",
+    label: "Easy",
+    detail: "Random valid moves.",
+  },
+  {
+    value: "medium",
+    label: "Medium",
+    detail: "Wins or blocks before going random.",
+  },
+  {
+    value: "hard",
+    label: "Hard",
+    detail: "Wins, blocks, then prefers strong squares.",
+  },
+];
+const CPU_SIDE_OPTIONS = [
+  {
+    value: "O",
+    label: "You are X",
+    detail: "You move with crosses and the CPU takes noughts.",
+  },
+  {
+    value: "X",
+    label: "You are O",
+    detail: "You move with noughts and the CPU takes crosses.",
+  },
+];
 
 function createInitialEntry(boardSize) {
   return {
@@ -233,6 +278,20 @@ export default function Game() {
     () => hasRecordedGames(recordsState.records),
     [recordsState.records]
   );
+  const currentTurnChipLabel = useMemo(() => {
+    if (winner) {
+      return `Winner: ${formatPlayerLabel(playerDisplayNames[winner], winner)}`;
+    }
+
+    if (isDraw) {
+      return "Result: Draw";
+    }
+
+    return `Turn: ${formatPlayerLabel(
+      playerDisplayNames[currentPlayer],
+      currentPlayer
+    )}`;
+  }, [currentPlayer, isDraw, playerDisplayNames, winner]);
   const inviteStatusContent = useMemo(() => {
     if (!isInviteMode) {
       return null;
@@ -705,6 +764,125 @@ export default function Game() {
     },
     [cpuPlayerSymbol, invalidatePendingCpuTurn, resetMatch]
   );
+  const statusChips = useMemo(() => {
+    const isBoardConfigurable = !(isInviteMode && routeState.kind === "invite-room");
+    const chips = [
+      {
+        id: "game-mode",
+        label: "",
+        labelPrefix: "Mode",
+        ariaLabel: "Change game mode",
+        isInteractive: true,
+        options: GAME_MODE_OPTIONS.map((option) => ({
+          value: option.value,
+          label: option.label,
+          selected: option.value === gameMode,
+        })),
+        onSelect: handleGameModeChange,
+      },
+      {
+        id: "board-size",
+        label: "",
+        labelPrefix: "Board",
+        ariaLabel: isBoardConfigurable
+          ? "Change board size"
+          : `Board size locked at ${boardSize} by ${boardSize}`,
+        isInteractive: isBoardConfigurable,
+        options: SUPPORTED_BOARD_SIZES.map((size) => {
+          return {
+            value: size,
+            label: `${size} x ${size}`,
+            selected: size === boardSize,
+          };
+        }),
+        onSelect: handleBoardSizeChange,
+      },
+      {
+        id: "win-rule",
+        label: `Goal: Connect ${winLength}`,
+      },
+      {
+        id: "current-turn",
+        label: currentTurnChipLabel,
+      },
+    ];
+
+    if (isInviteMode) {
+      if (inviteRoom?.id) {
+        chips.push({
+          id: "invite-room",
+          label: `Room: ${inviteRoom.status}`,
+        });
+      }
+
+      if (inviteParticipantSymbol) {
+        chips.push({
+          id: "invite-role",
+          label: `You are ${inviteParticipantSymbol}`,
+        });
+      }
+
+      return chips;
+    }
+
+    chips.push({
+      id: "starter",
+      label: `Starter: ${formatPlayerLabel(
+        playerDisplayNames[startingPlayer],
+        startingPlayer
+      )}`,
+    });
+
+    if (isCpuMode) {
+      chips.push({
+        id: "cpu-side",
+        label: "",
+        labelPrefix: "Side",
+        ariaLabel: "Change which side you play",
+        isInteractive: true,
+        options: CPU_SIDE_OPTIONS.map((option) => ({
+          value: option.value,
+          label: option.label,
+          selected: option.value === cpuPlayerSymbol,
+        })),
+        onSelect: handleCpuPlayerSymbolChange,
+      });
+      chips.push({
+        id: "cpu-difficulty",
+        label: "",
+        labelPrefix: "CPU",
+        ariaLabel: "Change CPU difficulty",
+        isInteractive: true,
+        options: CPU_DIFFICULTY_OPTIONS.map((option) => ({
+          value: option.value,
+          label: option.label,
+          selected: option.value === cpuDifficulty,
+        })),
+        onSelect: handleCpuDifficultyChange,
+      });
+    }
+
+    return chips;
+  }, [
+    boardSize,
+    cpuDifficulty,
+    cpuPlayerSymbol,
+    currentTurnChipLabel,
+    gameMode,
+    handleBoardSizeChange,
+    handleCpuDifficultyChange,
+    handleCpuPlayerSymbolChange,
+    handleGameModeChange,
+    humanPlayerSymbol,
+    inviteParticipantSymbol,
+    inviteRoom,
+    isCpuMode,
+    isInviteMode,
+    playerDisplayNames,
+    routeState.kind,
+    startingPlayer,
+    winLength,
+  ]);
 
   const handleToggleSort = useCallback(() => {
     setIsAscending((previousValue) => !previousValue);
@@ -1522,7 +1700,7 @@ export default function Game() {
               playerDisplayNames={playerDisplayNames}
               statusOverride={inviteStatusContent?.status ?? ""}
               detailOverride={inviteStatusContent?.detail ?? ""}
-              statusChipsOverride={inviteStatusContent?.chips ?? null}
+              statusChips={statusChips}
             />
 
             <Board
@@ -1651,30 +1829,6 @@ export default function Game() {
               authErrorMessage={authErrorMessage}
               isAuthBusy={isAuthBusy}
             />
-
-            <section className="sidebar-card control-panel" aria-labelledby="game-setup-title">
-              <div className="sidebar-panel-copy">
-                <p className="eyebrow">Match settings</p>
-                <h2 id="game-setup-title">Change setup without leaving the board</h2>
-              </div>
-
-              <div className="setup-layout">
-                <GameModeSelector
-                  gameMode={gameMode}
-                  cpuDifficulty={cpuDifficulty}
-                  cpuPlayerSymbol={cpuPlayerSymbol}
-                  onGameModeChange={handleGameModeChange}
-                  onCpuDifficultyChange={handleCpuDifficultyChange}
-                  onCpuPlayerSymbolChange={handleCpuPlayerSymbolChange}
-                />
-
-                <BoardSizeSelector
-                  boardRules={effectiveBoardRules}
-                  onBoardSizeChange={handleBoardSizeChange}
-                  disabled={isInviteMode && routeState.kind === "invite-room"}
-                />
-              </div>
-            </section>
 
             {isInviteMode ? (
               <InviteMatchPanel
