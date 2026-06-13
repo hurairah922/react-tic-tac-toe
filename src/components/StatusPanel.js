@@ -1,4 +1,26 @@
-import { memo } from "react";
+import { memo, useMemo } from "react";
+
+function normalizeChip(chip, index) {
+  if (typeof chip === "string") {
+    return {
+      id: `status-chip-${index}`,
+      label: chip,
+      isInteractive: false,
+      tone: "default",
+    };
+  }
+
+  return {
+    id: chip.id ?? `status-chip-${index}`,
+    label: chip.label ?? "",
+    labelPrefix: chip.labelPrefix ?? "",
+    isInteractive: Boolean(chip.isInteractive),
+    tone: chip.tone ?? "default",
+    ariaLabel: chip.ariaLabel ?? "",
+    options: Array.isArray(chip.options) ? chip.options : [],
+    onSelect: chip.onSelect,
+  };
+}
 
 function StatusPanel({
   currentMove,
@@ -18,7 +40,7 @@ function StatusPanel({
   playerDisplayNames,
   statusOverride = "",
   detailOverride = "",
-  statusChipsOverride = null,
+  statusChips = [],
 }) {
   const isCpuMode = gameMode === "cpu";
   const nextPlayer = xIsNext ? "X" : "O";
@@ -58,7 +80,7 @@ function StatusPanel({
     detail = `${lastMoveSummary} ${detail}`;
   }
 
-  const statusChips = [
+  const fallbackStatusChips = [
     `${isCpuMode ? "Human vs CPU" : "Human vs Human"}`,
     `${boardSize}x${boardSize}`,
     `${winLength} in a row`,
@@ -66,8 +88,8 @@ function StatusPanel({
   ];
 
   if (isCpuMode) {
-    statusChips.push(`You are ${humanPlayerSymbol}`);
-    statusChips.push(`CPU: ${cpuDifficultyLabel}`);
+    fallbackStatusChips.push(`You are ${humanPlayerSymbol}`);
+    fallbackStatusChips.push(`CPU: ${cpuDifficultyLabel}`);
   }
 
   if (statusOverride) {
@@ -79,9 +101,13 @@ function StatusPanel({
   }
 
   const renderedStatusChips =
-    Array.isArray(statusChipsOverride) && statusChipsOverride.length > 0
-      ? statusChipsOverride
-      : statusChips;
+    Array.isArray(statusChips) && statusChips.length > 0
+      ? statusChips
+      : fallbackStatusChips;
+  const normalizedChips = useMemo(
+    () => renderedStatusChips.map(normalizeChip),
+    [renderedStatusChips]
+  );
 
   return (
     <section className="status-strip" aria-label="Game status">
@@ -91,12 +117,59 @@ function StatusPanel({
         <p className="status-detail">{detail}</p>
       </div>
 
-      <div className="status-chip-row" aria-label="Game summary">
-        {renderedStatusChips.map((chip) => (
-          <span className="status-chip" key={chip}>
-            {chip}
-          </span>
-        ))}
+      <div className="status-chip-row" aria-label="Game summary and controls">
+        {normalizedChips.map((chip) =>
+          chip.isInteractive ? (() => {
+            const selectedOption =
+              chip.options.find((option) => option.selected) ?? chip.options[0];
+
+            return (
+              <label
+                className={`status-chip status-chip-select${
+                  chip.tone === "strong" ? " status-chip-strong" : ""
+                }`}
+                key={chip.id}
+              >
+                <span className="status-chip-select-value">
+                  {chip.labelPrefix ? (
+                    <span className="status-chip-prefix">{chip.labelPrefix}</span>
+                  ) : null}
+                  <span className="status-chip-select-text">
+                    {selectedOption?.label ?? ""}
+                  </span>
+                </span>
+                <select
+                  className="status-chip-select-control"
+                  aria-label={chip.ariaLabel || chip.label || chip.labelPrefix}
+                  value={selectedOption?.value ?? ""}
+                  onChange={(event) => chip.onSelect?.(event.target.value)}
+                >
+                  {chip.options.map((option) => (
+                    <option
+                      key={`${chip.id}-${String(option.value)}`}
+                      value={option.value}
+                    >
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <span className="status-chip-caret" aria-hidden="true">
+                  ▾
+                </span>
+              </label>
+            );
+          })() : (
+            <span
+              className={`status-chip status-chip-readonly${
+                chip.tone === "strong" ? " status-chip-strong" : ""
+              }`}
+              key={chip.id}
+              aria-label={chip.ariaLabel || chip.label}
+            >
+              {chip.label}
+            </span>
+          )
+        )}
         <span className="status-chip status-chip-strong">Move #{currentMove}</span>
       </div>
     </section>
