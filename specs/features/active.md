@@ -1,54 +1,25 @@
-# README Update Prompt
+# Multiplayer Pause
 
-Update the README to clearly document the new UX direction for the game settings/status controls.
+## Summary
 
-## Important UX Clarification
+Pause multiplayer in the user-facing product until the invite and room flow is ready for production use.
 
-Do **not** move the game information/status section into the game board area.
+## Requirements
 
-The section that currently displays game information, such as:
+- Remove or hide multiplayer mode from the visible game mode selector.
+- Do not show invite-link creation or join UI in the main interface.
+- Keep any existing multiplayer logic only if it is safely gated behind a feature flag or internal constant.
+- Ensure local two-player and CPU modes still work normally.
+- Ensure board size selection remains visible and usable for all active modes.
+- Do not delete Phase 9 notes.
+- Mark multiplayer as paused in the specs.
+- Add a comment near the feature flag explaining that multiplayer is paused because real-time room sync, third-player handling, and invite state are not ready.
 
-```html
-<div class="status-chip-row" aria-label="Game summary">
-  <span class="status-...
-```
+## UX Requirement
 
-should remain the single, always-visible place where users can view and control the game state.
-
-## Required README Changes
-
-Document that the game now uses the **status chip row** as the primary control surface for game configuration.
-
-The following displayed game information should become clickable directly from the status chip row:
-
-- Selected board
-- Current player / player turn information
-- Difficulty level
-- Any other game configuration currently duplicated elsewhere in settings
-
-## UX Goal
-
-The goal is to avoid having multiple settings locations.
-
-Instead of having a separate settings/options panel for these controls, users should be able to control the game from one consistent place that stays visible in the viewport.
-
-This creates a simpler, less confusing UX.
-
-## README Wording to Add
-
-Add a section similar to this:
-
-### Game Controls and Status Chips
-
-The game summary/status chip row is the primary place for both viewing and updating active game settings.
-
-The chips show the current game configuration, including the selected board, player state, and difficulty level. These chips are interactive, so users can change those settings directly from the always-visible status area instead of opening a separate settings panel.
-
-This keeps the most important game controls in one consistent location, reduces duplicated UI, and makes the game easier to understand while playing.
+The user should not see multiplayer as an available option until it is fully implemented.
 
 ## Notes
 
-- Do not describe this as moving controls into the board.
-- Do not add a second settings area.
-- Do not document the removed settings/options UI as still existing.
-- Preserve the existing README style, heading hierarchy, spacing, and formatting.
+- This is a temporary product pause, not a permanent deletion of the multiplayer implementation.
+- Invite and room logic may stay in the codebase as long as it is not exposed in the visible UI.

@@ -241,6 +241,8 @@ Exit criteria:
 
 ## Phase 8: Invite-Link Multiplayer
 
+Status: paused for now.
+
 Goal:
 
 Let users invite a friend to a private match.
@@ -265,6 +267,11 @@ Exit criteria:
 - Player A can invite Player B.
 - Both players see correct board state.
 - Invalid or completed rooms show useful messages.
+
+Pause note:
+
+- Hide multiplayer from the user-facing UI until room sync, third-player handling, and invite state recovery are ready.
+- Keep any existing implementation behind an internal feature flag instead of exposing partial UX.
 
 ## Phase 9: Real-Time Multiplayer
 
@@ -341,4 +348,3 @@ Entry criteria:
 - Auth and records are reliable.
 - Multiplayer has real usage.
 - Infrastructure cost is understood.
-

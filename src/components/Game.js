@@ -75,6 +75,9 @@ import {
 } from "../utils/inviteRoutes";
 
 const CPU_MOVE_DELAY_MS = 450;
+// Multiplayer is paused until real-time room sync, third-player handling,
+// and invite state recovery are ready for production use.
+const MULTIPLAYER_ENABLED = false;
 const GAME_MODE_OPTIONS = [
   {
     value: "human",
@@ -91,7 +94,7 @@ const GAME_MODE_OPTIONS = [
     label: "Invite multiplayer",
     detail: "Create a private share link for a signed-in opponent.",
   },
-];
+].filter((option) => MULTIPLAYER_ENABLED || option.value !== "invite");
 const CPU_DIFFICULTY_OPTIONS = [
   {
     value: "easy",
@@ -204,11 +207,14 @@ export default function Game() {
   const recordsRef = useRef(recordsState.records);
   const recordsSourceRef = useRef(recordsState.source);
 
-  const gameMode = routeState.kind === "home" ? selectedGameMode : "invite";
-  const isInviteMode = gameMode === "invite";
+  const gameMode =
+    MULTIPLAYER_ENABLED && routeState.kind !== "home"
+      ? "invite"
+      : selectedGameMode;
+  const isInviteMode = MULTIPLAYER_ENABLED && gameMode === "invite";
   const isCpuMode = gameMode === "cpu";
   const humanPlayerSymbol = getHumanPlayerSymbol(cpuPlayerSymbol);
-  const inviteEnabled = canUseInviteMultiplayer(authUser);
+  const inviteEnabled = MULTIPLAYER_ENABLED && canUseInviteMultiplayer(authUser);
   const inviteRoom = inviteRoomState.room;
   const inviteParticipantSymbol = useMemo(
     () => getInviteRoomParticipantSymbol(inviteRoom, authUser?.id),
@@ -719,6 +725,10 @@ export default function Game() {
   const handleGameModeChange = useCallback(
     (nextGameMode) => {
       if (nextGameMode === "invite") {
+        if (!MULTIPLAYER_ENABLED) {
+          return;
+        }
+
         invalidatePendingCpuTurn();
         navigateToInviteLobby();
         return;
@@ -1197,6 +1207,15 @@ export default function Game() {
   }, []);
 
   useEffect(() => {
+    if (MULTIPLAYER_ENABLED || routeState.kind === "home") {
+      return;
+    }
+
+    setInviteRoomState(createInitialInviteRoomState());
+    navigateHome({ replace: true });
+  }, [routeState.kind]);
+
+  useEffect(() => {
     let isMounted = true;
 
     loadAuthState()
@@ -1245,6 +1264,10 @@ export default function Game() {
   }, [applyAuthState]);
 
   useEffect(() => {
+    if (!MULTIPLAYER_ENABLED) {
+      return;
+    }
+
     if (!isAuthResolved) {
       return;
     }
@@ -1330,6 +1353,11 @@ export default function Game() {
   }, [authUser, inviteEnabled, isAuthResolved, routeState.kind]);
 
   useEffect(() => {
+    if (!MULTIPLAYER_ENABLED) {
+      setInviteRoomState(createInitialInviteRoomState());
+      return;
+    }
+
     if (routeState.kind === "home") {
       setInviteRoomState(createInitialInviteRoomState());
       return;
@@ -1344,6 +1372,10 @@ export default function Game() {
   }, [routeState.kind]);
 
   useEffect(() => {
+    if (!MULTIPLAYER_ENABLED) {
+      return undefined;
+    }
+
     if (routeState.kind !== "invite-room") {
       return undefined;
     }
@@ -1433,6 +1465,10 @@ export default function Game() {
   }, [authUser, inviteEnabled, isAuthResolved, routeState.kind, routeState.roomId]);
 
   useEffect(() => {
+    if (!MULTIPLAYER_ENABLED) {
+      return undefined;
+    }
+
     if (
       routeState.kind !== "invite-room" ||
       !routeState.roomId ||
@@ -1830,7 +1866,7 @@ export default function Game() {
               isAuthBusy={isAuthBusy}
             />
 
-            {isInviteMode ? (
+            {MULTIPLAYER_ENABLED && isInviteMode ? (
               <InviteMatchPanel
                 authUser={authUser}
                 canUseInviteMultiplayer={inviteEnabled}

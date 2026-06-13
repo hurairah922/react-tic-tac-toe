@@ -223,7 +223,7 @@ Acceptance criteria:
 
 ## Phase 9: Invite-Link Multiplayer
 
-Status: `Active`
+Status: `Paused`
 
 Goal:
 
@@ -236,6 +236,25 @@ Acceptance criteria:
 - Second player can join through the link.
 - Both players have display names.
 - Invalid rooms show clear errors.
+
+Reason:
+
+Multiplayer requires real-time room sync, third-player handling, invite ownership/state recovery, player limits, presence handling, and invalid-room recovery. This is too expensive for the current product stage.
+
+Current decision:
+
+- Disable multiplayer from the user-facing UI.
+- Do not show invite-link controls.
+- Preserve any existing implementation behind a feature flag or internal toggle.
+- Keep local two-player and CPU modes as the active gameplay modes.
+- Board size selection must remain available for all active modes.
+
+Future requirements:
+
+- Only two active players may join a room.
+- Third visitor should see a clear “room full” or spectator-only state.
+- Room should store board size, player names, turn state, and match status.
+- Invalid, expired, or missing rooms should show clear errors.
 
 ## Phase 10: Real-Time Multiplayer
 
