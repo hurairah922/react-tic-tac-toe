@@ -151,6 +151,60 @@ function getHumanPlayerSymbol(cpuPlayerSymbol) {
   return cpuPlayerSymbol === "X" ? "O" : "X";
 }
 
+function ReplayIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="action-button-icon-svg"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path
+        d="M20 11a8 8 0 1 0-2.34 5.66"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+      <path
+        d="M20 4v7h-7"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+    </svg>
+  );
+}
+
+function CloseIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="action-button-icon-svg"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path
+        d="M6 6 18 18"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeWidth="1.8"
+      />
+      <path
+        d="M18 6 6 18"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeWidth="1.8"
+      />
+    </svg>
+  );
+}
+
 export default function Game() {
   const initialAuthState = useMemo(() => getInitialAuthState(), []);
   const [routeState, setRouteState] = useState(() => parseInviteRoute());
@@ -163,6 +217,8 @@ export default function Game() {
   const [nextStartingPlayer, setNextStartingPlayer] = useState(
     DEFAULT_STARTING_PLAYER
   );
+  const [isMatchCompleteOverlayDismissed, setIsMatchCompleteOverlayDismissed] =
+    useState(false);
   const [isAscending, setIsAscending] = useState(true);
   const [isLearnModalOpen, setIsLearnModalOpen] = useState(false);
   const [selectedGameMode, setSelectedGameMode] = useState("cpu");
@@ -497,6 +553,39 @@ export default function Game() {
     isInviteMode,
     winner,
   ]);
+  const completedMatchStatus = useMemo(() => {
+    if (isInviteMode || (!winner && !isDraw)) {
+      return null;
+    }
+
+    if (isDraw) {
+      return {
+        label: "Draw",
+        detail:
+          "The board is full. Play again with the current setup or close this round.",
+        tone: "draw",
+      };
+    }
+
+    if (isCpuMode && winner === cpuPlayerSymbol) {
+      return {
+        label: "CPU Wins",
+        detail:
+          "The CPU completed the winning line. Play again to run it back or close this round.",
+        tone: "loss",
+      };
+    }
+
+    return {
+      label: `${playerDisplayNames[winner]} Wins`,
+      detail:
+        "The winning line is highlighted on the board. Start another round or close this result.",
+      tone: "win",
+    };
+  }, [cpuPlayerSymbol, isCpuMode, isDraw, isInviteMode, playerDisplayNames, winner]);
+  const isMatchComplete = isInviteMode
+    ? Boolean(inviteRoom?.winner)
+    : Boolean(winnerInfo) || isDraw;
   const isInviteInteractionDisabled =
     !isInviteMode ||
     inviteRoomState.isLoading ||
@@ -558,6 +647,7 @@ export default function Game() {
       activeMatchIdRef.current += 1;
       recordedMatchIdRef.current = null;
       matchWasTimeTraveledRef.current = false;
+      setIsMatchCompleteOverlayDismissed(false);
       setStartingPlayer(nextStarter);
       setHistory([createInitialEntry(nextBoardSize)]);
       setCurrentMove(0);
@@ -686,6 +776,10 @@ export default function Game() {
     invalidatePendingCpuTurn();
     resetMatch({ nextStarter: nextStartingPlayer });
   }, [invalidatePendingCpuTurn, isInviteMode, nextStartingPlayer, resetMatch]);
+
+  const handleDismissMatchCompleteOverlay = useCallback(() => {
+    setIsMatchCompleteOverlayDismissed(true);
+  }, []);
 
   const undoMoveTarget = isInviteMode
     ? null
@@ -1699,19 +1793,23 @@ export default function Game() {
     winner,
   ]);
 
-  const isMatchComplete = isInviteMode
-    ? Boolean(inviteRoom?.winner)
-    : Boolean(winnerInfo) || isDraw;
+  useEffect(() => {
+    if (!isMatchComplete) {
+      setIsMatchCompleteOverlayDismissed(false);
+    }
+  }, [isMatchComplete]);
 
   return (
     <main className="app-shell">
       <section className="game-card" aria-label="Tic-tac-toe game">
         <header className="game-header">
           <div className="hero-stack">
-            <p className="eyebrow">A Modern</p>
-            <h1>Tic-Tac-Toe</h1>
+            <p className="eyebrow">Free browser game</p>
+            <h1>Tic-Tac-Toe Online</h1>
             <p className="game-header-copy">
-              Choose a mode, pick a board, and jump straight into the round.
+              Play Tic-Tac-Toe online in your browser. Choose a 3x3, 4x4, or
+              5x5 board, play against another player or the computer, and start
+              a quick match without downloads or sign-up.
             </p>
           </div>
         </header>
@@ -1740,6 +1838,53 @@ export default function Game() {
             />
 
             <Board
+              overlay={
+                !isInviteMode &&
+                isMatchComplete &&
+                !isMatchCompleteOverlayDismissed ? (
+                  <section
+                    className={`match-complete-panel match-complete-panel-${
+                      completedMatchStatus?.tone ?? "win"
+                    }`}
+                    aria-label="Completed round actions"
+                  >
+                    <div className="match-complete-summary" aria-live="polite">
+                      <p className="match-complete-label">
+                        {completedMatchStatus?.label ?? "Round Complete"}
+                      </p>
+                      <p className="match-complete-detail">
+                        {completedMatchStatus?.detail ?? ""}
+                      </p>
+                    </div>
+
+                    <div className="match-complete-actions">
+                      <button
+                        type="button"
+                        className="endgame-action-button endgame-action-button-primary"
+                        onClick={handleNewGame}
+                        aria-label="Play again with the current settings"
+                      >
+                        <span className="action-button-icon">
+                          <ReplayIcon />
+                        </span>
+                        <span>Play Again</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        className="endgame-action-button endgame-action-button-secondary"
+                        onClick={handleDismissMatchCompleteOverlay}
+                        aria-label="Close this completed round message"
+                      >
+                        <span className="action-button-icon">
+                          <CloseIcon />
+                        </span>
+                        <span>Close</span>
+                      </button>
+                    </div>
+                  </section>
+                ) : null
+              }
               actions={
                 isInviteMode ? (
                   canStartInviteRematch ? (
@@ -1766,23 +1911,25 @@ export default function Game() {
                       </button>
                     ) : null}
 
-                    <button
-                      type="button"
-                      className="history-sort-button"
-                      onClick={handleUndo}
-                      disabled={!canUndo}
-                    >
-                      Undo
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        className="history-sort-button"
+                        onClick={handleUndo}
+                        disabled={!canUndo}
+                      >
+                        Undo
+                      </button>
 
-                    <button
-                      type="button"
-                      className="reset-button"
-                      onClick={handleReset}
-                      disabled={history.length === 1}
-                    >
-                      Reset Game
-                    </button>
+                      <button
+                        type="button"
+                        className="reset-button"
+                        onClick={handleReset}
+                        disabled={history.length === 1}
+                      >
+                        Reset Game
+                      </button>
+                    </>
                   </div>
                 )
               }
@@ -1911,6 +2058,19 @@ export default function Game() {
 
           </aside>
         </div>
+
+        <footer className="creator-attribution" aria-label="Creator attribution">
+          <p className="creator-attribution-copy">
+            Created by Abu Hurarrah. Explore more projects at{" "}
+            <a
+              className="creator-attribution-link"
+              href="https://abuhurarrah.com/"
+            >
+              abuhurarrah.com
+            </a>
+            .
+          </p>
+        </footer>
 
         {isLearnModalOpen ? (
           <LearnModal boardRules={effectiveBoardRules} onClose={handleCloseLearnModal} />
