@@ -4,6 +4,7 @@ import { DEFAULT_BOARD_RULES } from "../utils/gameLogic";
 
 function Board({
   actions,
+  overlay,
   squares,
   boardSize = DEFAULT_BOARD_RULES.boardSize,
   onPlay,
@@ -64,22 +65,27 @@ function Board({
             <h2 id="board-heading">Make your move</h2>
           )}
         </div>
-
-        {actions ? <div className="board-card-actions">{actions}</div> : null}
       </div>
 
-      <div
-        className="board-grid"
-        style={boardStyle}
-        role="grid"
-        aria-label="Tic-tac-toe board"
-      >
-        {rows}
+      <div className="board-grid-shell">
+        <div
+          className="board-grid"
+          style={boardStyle}
+          role="grid"
+          aria-label="Tic-tac-toe board"
+        >
+          {rows}
+        </div>
+
+        {overlay ? <div className="board-grid-overlay">{overlay}</div> : null}
       </div>
 
       <p className="board-turn-notice" aria-live="polite">
         {turnNotice}
       </p>
+
+      {actions ? <div className="board-card-actions">{actions}</div> : null}
+
     </section>
   );
 }
